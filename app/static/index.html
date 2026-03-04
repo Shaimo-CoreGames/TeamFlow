@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TeamFlow — Project Management</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap"
+        rel="stylesheet" />
+    <style>
+        /* ===== VARIABLES ===== */
+        :root {
+            --bg: #0a0a0f;
+            --surface: #111118;
+            --surface2: #16161f;
+            --surface3: #1c1c28;
+            --border: rgba(255, 255, 255, 0.07);
+            --border-hover: rgba(255, 255, 255, 0.14);
+            --accent: #6c63ff;
+            --accent2: #ff6584;
+            --accent3: #43e97b;
+            --text: #f0f0f8;
+            --text-muted: #7a7a9a;
+            --text-dim: #4a4a6a;
+            --shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            --radius: 14px;
+            --radius-sm: 8px;
+            --sidebar-w: 260px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface3);
+            border-radius: 4px;
+        }
+
+        /* ===== AUTH SCREEN ===== */
+        #auth-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #auth-screen::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(108, 99, 255, 0.12) 0%, transparent 70%);
+            top: -100px;
+            left: -100px;
+            animation: pulse 6s ease-in-out infinite;
+        }
+
+        #auth-screen::after {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(255, 101, 132, 0.08) 0%, transparent 70%);
+            bottom: -100px;
+            right: -100px;
+            animation: pulse 8s ease-in-out infinite reverse;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+        }
+
+        .auth-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 48px;
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 36px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--surface2);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 28px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            background: var(--surface3);
+            color: var(--text);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            font-family: 'Syne', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-primary:hover {
+            background: #7c74ff;
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-error {
+            background: rgba(255, 101, 132, 0.1);
+            border: 1px solid rgba(255, 101, 132, 0.2);
+            color: var(--accent2);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        /* ===== APP LAYOUT ===== */
+        #app {
+            display: none;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+
+        /* ===== TOP NAV ===== */
+        .topnav {
+            height: 60px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            gap: 16px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .topnav-logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-right: 8px;
+        }
+
+        .topnav-nav {
+            display: flex;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .nav-btn {
+            padding: 7px 14px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        .nav-btn.active {
+            background: var(--surface3);
+            color: var(--text);
+        }
+
+        .topnav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--surface2);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .btn-ghost {
+            padding: 7px 14px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--border-hover);
+            color: var(--text);
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            margin-top: 60px;
+            flex: 1;
+            padding: 32px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            padding-top: 92px;
+        }
+
+        /* ===== VIEWS ===== */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* ===== PAGE HEADER ===== */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .page-sub {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn-add {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            font-family: 'Syne', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-add:hover {
+            background: #7c74ff;
+            transform: translateY(-1px);
+        }
+
+        /* ===== CARDS GRID ===== */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: var(--surface2);
+            color: var(--text-muted);
+        }
+
+        .btn-edit:hover {
+            background: var(--surface3);
+            color: var(--text);
+        }
+
+        .btn-del {
+            background: rgba(255, 101, 132, 0.1);
+            color: var(--accent2);
+        }
+
+        .btn-del:hover {
+            background: rgba(255, 101, 132, 0.2);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge-pending {
+            background: rgba(255, 200, 80, 0.1);
+            color: #ffc850;
+        }
+
+        .badge-progress {
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent);
+        }
+
+        .badge-done {
+            background: rgba(67, 233, 123, 0.1);
+            color: var(--accent3);
+        }
+
+        .badge-high {
+            background: rgba(255, 101, 132, 0.1);
+            color: var(--accent2);
+        }
+
+        .badge-medium {
+            background: rgba(255, 200, 80, 0.1);
+            color: #ffc850;
+        }
+
+        .badge-low {
+            background: rgba(67, 233, 123, 0.1);
+            color: var(--accent3);
+        }
+
+        .badge-default {
+            background: var(--surface2);
+            color: var(--text-muted);
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        .empty-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 18px;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-sub {
+            font-size: 14px;
+        }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(6px);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
+            max-width: 480px;
+            transform: scale(0.95) translateY(10px);
+            transition: transform 0.2s;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.open .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            background: var(--surface2);
+            border: none;
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--surface3);
+            color: var(--text);
+        }
+
+        .modal-error {
+            background: rgba(255, 101, 132, 0.1);
+            border: 1px solid rgba(255, 101, 132, 0.2);
+            color: var(--accent2);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        select.form-input {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237a7a9a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* ===== DASHBOARD ===== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 22px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-family: 'Syne', sans-serif;
+            font-size: 36px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ===== TASKS TABLE VIEW ===== */
+        .tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .task-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s;
+        }
+
+        .task-item:hover {
+            border-color: var(--border-hover);
+        }
+
+        .task-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .task-name {
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        .task-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        /* ===== TOAST ===== */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 999;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+
+        #toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        #toast.success {
+            background: rgba(67, 233, 123, 0.15);
+            border: 1px solid rgba(67, 233, 123, 0.3);
+            color: var(--accent3);
+        }
+
+        #toast.error {
+            background: rgba(255, 101, 132, 0.15);
+            border: 1px solid rgba(255, 101, 132, 0.3);
+            color: var(--accent2);
+        }
+
+        /* ===== LOADER ===== */
+        .loader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--surface3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ===== PROFILE ===== */
+        .profile-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            max-width: 500px;
+        }
+
+        .profile-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Syne', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 640px) {
+            .main-content {
+                padding: 16px;
+                padding-top: 80px;
+            }
+
+            .topnav-nav {
+                display: none;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ======== AUTH SCREEN ======== -->
+    <div id="auth-screen">
+        <div class="auth-box">
+            <div class="auth-logo">TeamFlow</div>
+            <div class="auth-subtitle">Multi-tenant Project Management</div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+                <button class="auth-tab" onclick="switchTab('register')">Register</button>
+            </div>
+
+            <div id="auth-error" class="auth-error"></div>
+
+            <!-- Login Form -->
+            <div id="login-form">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="you@example.com" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="••••••••" />
+                </div>
+                <button class="btn-primary" onclick="doLogin()">Sign In</button>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" style="display:none">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="reg-name" class="form-input" placeholder="Jane Doe" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="reg-email" class="form-input" placeholder="you@example.com" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="reg-password" class="form-input" placeholder="Min 6 characters" />
+                </div>
+                <button class="btn-primary" onclick="doRegister()">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== APP ======== -->
+    <div id="app" style="display:none; flex-direction:column;">
+
+        <!-- TOP NAV -->
+        <nav class="topnav">
+            <div class="topnav-logo">TeamFlow</div>
+            <div class="topnav-nav">
+                <button class="nav-btn active" onclick="showView('dashboard')">Dashboard</button>
+                <button class="nav-btn" onclick="showView('orgs')">Organizations</button>
+                <button class="nav-btn" onclick="showView('projects')">Projects</button>
+                <button class="nav-btn" onclick="showView('tasks')">Tasks</button>
+                <button class="nav-btn" onclick="showView('members')">Members</button>
+                <button class="nav-btn" onclick="showView('profile')">Profile</button>
+            </div>
+            <div class="topnav-right">
+                <div class="user-chip">
+                    <div class="avatar" id="nav-avatar">U</div>
+                    <span id="nav-name">User</span>
+                </div>
+                <button class="btn-ghost" onclick="doLogout()">Logout</button>
+            </div>
+        </nav>
+
+        <div class="main-content">
+
+            <!-- DASHBOARD VIEW -->
+            <div id="view-dashboard" class="view active">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Dashboard</div>
+                        <div class="page-sub">Welcome back! Here's what's happening.</div>
+                    </div>
+                </div>
+                <div class="stats-row" id="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">Organizations</div>
+                        <div class="stat-value" id="stat-orgs">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Projects</div>
+                        <div class="stat-value" id="stat-projects">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Tasks</div>
+                        <div class="stat-value" id="stat-tasks">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Completed</div>
+                        <div class="stat-value" id="stat-done">—</div>
+                    </div>
+                </div>
+                <div class="page-title" style="font-size:20px;margin-bottom:16px;">Recent Tasks</div>
+                <div id="dash-tasks"></div>
+            </div>
+
+            <!-- ORGS VIEW -->
+            <div id="view-orgs" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Organizations</div>
+                        <div class="page-sub">Manage your teams and workspaces</div>
+                    </div>
+                    <button class="btn-add" onclick="openModal('org')">＋ New Organization</button>
+                </div>
+                <div class="cards-grid" id="orgs-grid"></div>
+            </div>
+
+            <!-- PROJECTS VIEW -->
+            <div id="view-projects" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Projects</div>
+                        <div class="page-sub">Track your work across organizations</div>
+                    </div>
+                    <button class="btn-add" onclick="openModal('project')">＋ New Project</button>
+                </div>
+                <div class="cards-grid" id="projects-grid"></div>
+            </div>
+
+            <!-- TASKS VIEW -->
+            <div id="view-tasks" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Tasks</div>
+                        <div class="page-sub">All tasks across your projects</div>
+                    </div>
+                    <button class="btn-add" onclick="openModal('task')">＋ New Task</button>
+                </div>
+                <div class="tasks-list" id="tasks-list"></div>
+            </div>
+
+            <!-- MEMBERS VIEW -->
+            <div id="view-members" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Members</div>
+                        <div class="page-sub">Add members to your organizations</div>
+                    </div>
+                    <button class="btn-add" onclick="openModal('member')">＋ Add Member</button>
+                </div>
+                <div id="members-grid" class="cards-grid"></div>
+            </div>
+
+            <!-- PROFILE VIEW -->
+            <div id="view-profile" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Profile</div>
+                        <div class="page-sub">Your account settings</div>
+                    </div>
+                </div>
+                <div class="profile-card">
+                    <div class="profile-avatar" id="profile-avatar">U</div>
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" id="profile-name" class="form-input" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="profile-email" class="form-input" readonly
+                            style="opacity:0.5;cursor:not-allowed;" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">New Password (leave blank to keep current)</label>
+                        <input type="password" id="profile-pass" class="form-input" placeholder="••••••••" />
+                    </div>
+                    <button class="btn-primary" style="width:auto;padding:10px 24px;" onclick="saveProfile()">Save
+                        Changes</button>
+                </div>
+            </div>
+
+        </div><!-- /main-content -->
+    </div><!-- /app -->
+
+    <!-- ======== MODALS ======== -->
+
+    <!-- Org Modal -->
+    <div class="modal-overlay" id="modal-org">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="org-modal-title">New Organization</div>
+                <button class="modal-close" onclick="closeModal('org')">×</button>
+            </div>
+
+            <div class="modal-error" id="org-error"
+                style="display:none; color: #ff6584; background: rgba(255,101,132,0.1); padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px;">
+            </div>
+
+            <input type="hidden" id="org-edit-id" />
+
+            <div class="form-group">
+                <label class="form-label">Organization Name</label>
+                <input type="text" id="org-name" class="form-input" placeholder="Acme Corp"
+                    oninput="document.getElementById('org-slug').value = this.value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">URL Slug</label>
+                <input type="text" id="org-slug" class="form-input" placeholder="acme-corp" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea id="org-description" class="form-input" rows="3"
+                    placeholder="Describe your team..."></textarea>
+            </div>
+
+            <button type="button" class="btn-primary" onclick="saveOrg()">Save Organization</button>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div class="modal-overlay" id="modal-project">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="project-modal-title">New Project</div>
+                <button class="modal-close" onclick="closeModal('project')">×</button>
+            </div>
+            <div class="modal-error" id="project-error"></div>
+            <input type="hidden" id="project-edit-id" />
+            <div class="form-group">
+                <label class="form-label">Project Name</label>
+                <input type="text" id="project-name" class="form-input" placeholder="Website Redesign" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Organization</label>
+                <select id="project-org" class="form-input"></select>
+            </div>
+            <button class="btn-primary" onclick="saveProject()">Save Project</button>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal-overlay" id="modal-task">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="task-modal-title">New Task</div>
+                <button class="modal-close" onclick="closeModal('task')">×</button>
+            </div>
+            <div class="modal-error" id="task-error"></div>
+            <input type="hidden" id="task-edit-id" />
+            <div class="form-group">
+                <label class="form-label">Title</label>
+                <input type="text" id="task-title" class="form-input" placeholder="Design landing page" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea id="task-desc" class="form-input" placeholder="Details..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Project</label>
+                <select id="task-project" class="form-input"></select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select id="task-priority" class="form-input">
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="task-status" class="form-input">
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Done">Done</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Due Date (optional)</label>
+                <input type="datetime-local" id="task-due" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Assign To (User ID, optional)</label>
+                <input type="number" id="task-assigned" class="form-input" placeholder="User ID" />
+            </div>
+            <button class="btn-primary" onclick="saveTask()">Save Task</button>
+        </div>
+    </div>
+
+    <!-- Member Modal -->
+    <div class="modal-overlay" id="modal-member">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Add Member</div>
+                <button class="modal-close" onclick="closeModal('member')">×</button>
+            </div>
+            <div class="modal-error" id="member-error"></div>
+            <div class="form-group">
+                <label class="form-label">User ID</label>
+                <input type="number" id="member-user" class="form-input" placeholder="User ID" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Organization</label>
+                <select id="member-org" class="form-input"></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Role</label>
+                <input type="text" id="member-role" class="form-input" placeholder="e.g. developer, admin, viewer" />
+            </div>
+            <button class="btn-primary" onclick="saveMember()">Add Member</button>
+        </div>
+    </div>
+
+    <!-- Comment Modal -->
+    <div class="modal-overlay" id="modal-comment">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Add Comment</div>
+                <button class="modal-close" onclick="closeModal('comment')">×</button>
+            </div>
+            <div class="modal-error" id="comment-error"></div>
+            <input type="hidden" id="comment-task-id" />
+            <div class="form-group">
+                <label class="form-label">Comment</label>
+                <textarea id="comment-content" class="form-input" rows="4"
+                    placeholder="Write your comment..."></textarea>
+            </div>
+            <button class="btn-primary" onclick="saveComment()">Post Comment</button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <script>
+        // ===================================================
+        // CONFIG
+        // ===================================================
+        const API = '';  // same origin — adjust if different host e.g. 'http://localhost:8000'
+
+        // ===================================================
+        // STATE
+        // ===================================================
+        let state = {
+            token: localStorage.getItem('tf_token') || null,
+            refreshToken: localStorage.getItem('tf_refresh') || null,
+            user: null,
+            orgs: [],
+            projects: [],
+            tasks: [],
+            members: [],
+        };
+
+        // ===================================================
+        // UTILS
+        // ===================================================
+        function showToast(msg, type = 'success') {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = `show ${type}`;
+            clearTimeout(el._t);
+            el._t = setTimeout(() => el.className = '', 3000);
+        }
+
+        function setLoading(id, loading) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerHTML = loading ? '<div class="loader"><div class="spinner"></div></div>' : '';
+        }
+
+        function badge(text) {
+            if (!text) return '';
+            const t = text.toLowerCase().replace(' ', '');
+            const cls = t === 'pending' ? 'pending' : t === 'inprogress' ? 'progress' : t === 'done' ? 'done' : t === 'high' ? 'high' : t === 'medium' ? 'medium' : t === 'low' ? 'low' : 'default';
+            return `<span class="badge badge-${cls}">${text}</span>`;
+        }
+
+        function fmtDate(d) {
+            if (!d) return '';
+            return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function initials(name) {
+            if (!name) return 'U';
+            return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        }
+
+        // ===================================================
+        // API CALLS
+        // ===================================================
+        async function api(method, path, body, skipAuth = false) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (state.token && !skipAuth) headers['Authorization'] = `Bearer ${state.token}`;
+
+            const res = await fetch(API + path, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : undefined,
+            });
+
+            if (res.status === 401 && !skipAuth) {
+                // try refresh
+                if (state.refreshToken) {
+                    try {
+                        const r = await fetch(API + `/auth/refresh?refresh_token=${encodeURIComponent(state.refreshToken)}`, { method: 'POST', headers });
+                        if (r.ok) {
+                            const t = await r.json();
+                            setTokens(t);
+                            headers['Authorization'] = `Bearer ${state.token}`;
+                            const retry = await fetch(API + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                            if (!retry.ok) throw new Error((await retry.json()).detail || 'Request failed');
+                            return retry.status === 204 ? null : await retry.json();
+                        }
+                    } catch { }
+                }
+                doLogout();
+                throw new Error('Session expired');
+            }
+
+            if (res.status === 204) return null;
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+            return data;
+        }
+
+        function setTokens(t) {
+            state.token = t.access_token;
+            state.refreshToken = t.refresh_token;
+            localStorage.setItem('tf_token', t.access_token);
+            localStorage.setItem('tf_refresh', t.refresh_token);
+        }
+
+        // ===================================================
+        // AUTH
+        // ===================================================
+        function switchTab(tab) {
+            // 1. Clear errors
+            const errorEl = document.getElementById('auth-error');
+            if (errorEl) errorEl.style.display = 'none';
+
+            // 2. Handle the "Active" tab styling safely
+            document.querySelectorAll('.auth-tab').forEach(b => {
+                b.classList.remove('active');
+                // If this button matches the tab we are switching to, make it active
+                if (b.innerText.toLowerCase().includes(tab)) {
+                    b.classList.add('active');
+                }
+            });
+
+            // 3. Toggle form visibility
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+
+            if (loginForm) loginForm.style.display = tab === 'login' ? 'block' : 'none';
+            if (registerForm) registerForm.style.display = tab === 'register' ? 'block' : 'none';
+        }
+        function showAuthError(msg) {
+            const el = document.getElementById('auth-error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        async function doLogin() {
+            const emailEl = document.getElementById('login-email');
+            const passEl = document.getElementById('login-password');
+
+            const email = emailEl.value.trim();
+            const pass = passEl.value;
+
+            if (!email || !pass) {
+                return showAuthError('Please fill in all fields.');
+            }
+
+            try {
+                // OAuth2 standard uses 'username' and 'password' fields
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', pass);
+
+                const res = await fetch(API + '/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString(),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Login failed');
+                }
+
+                // IMPORTANT: Ensure setTokens saves the keys exactly as saveOrg expects
+                setTokens(data);
+
+                // Clear the form
+                emailEl.value = '';
+                passEl.value = '';
+
+                await loadApp();
+
+            } catch (e) {
+                console.error("Login Error:", e);
+                showAuthError(e.message);
+            }
+        }
+        async function doRegister() {
+            const name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const pass = document.getElementById('reg-password').value;
+
+            const errorEl = document.getElementById('auth-error'); // Make sure this ID exists
+
+            try {
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,      // Python expects 'name' (from UserBase)
+                        email: email,     // Python expects 'email' (from UserBase)
+                        password: pass    // Python expects 'password' (from UserCreate)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    // Detailed error handling to see EXACTLY why FastAPI rejected it
+                    let msg = "Registration failed";
+                    if (Array.isArray(data.detail)) {
+                        // Shows which specific field failed (e.g., "password: string too short")
+                        msg = data.detail.map(e => `${e.loc[1]}: ${e.msg}`).join(", ");
+                    } else if (data.detail) {
+                        msg = data.detail;
+                    }
+                    throw new Error(msg);
+                }
+
+                showToast('Account created! Please sign in.', 'success');
+
+                // Clear form and switch
+                document.getElementById('reg-name').value = '';
+                document.getElementById('reg-email').value = '';
+                document.getElementById('reg-password').value = '';
+
+                switchTab('login');
+
+            } catch (e) {
+                console.error("Registration Error:", e.message);
+                if (errorEl) {
+                    errorEl.textContent = e.message;
+                    errorEl.style.display = 'block';
+                }
+            }
+        }
+        function doLogout() {
+            state.token = null;
+            state.refreshToken = null;
+            state.user = null;
+            localStorage.removeItem('tf_token');
+            localStorage.removeItem('tf_refresh');
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('auth-screen').style.display = 'flex';
+        }
+
+        // ===================================================
+        // LOAD APP
+        // ===================================================
+        async function loadApp() {
+            try {
+                state.user = await api('GET', '/auth/me');
+            } catch {
+                doLogout(); return;
+            }
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+
+            // Set nav user info
+            document.getElementById('nav-avatar').textContent = initials(state.user.name);
+            document.getElementById('nav-name').textContent = state.user.name;
+
+            // Load data
+            await Promise.allSettled([loadOrgs(), loadProjects(), loadTasks()]);
+            renderDashboard();
+        }
+
+        // ===================================================
+        // VIEWS
+        // ===================================================
+        function showView(name) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`view-${name}`).classList.add('active');
+            event.target.classList.add('active');
+            if (name === 'dashboard') renderDashboard();
+            if (name === 'orgs') renderOrgs();
+            if (name === 'projects') renderProjects();
+            if (name === 'tasks') renderTasks();
+            if (name === 'members') renderMembers();
+            if (name === 'profile') renderProfile();
+        }
+
+        // ===================================================
+        // ORGS
+        // ===================================================
+        async function loadOrgs() {
+            try {
+                state.orgs = await api('GET', '/organizations/');
+            } catch { state.orgs = []; }
+        }
+
+        function renderOrgs() {
+            const grid = document.getElementById('orgs-grid');
+            if (!state.orgs.length) {
+                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏢</div><div class="empty-title">No Organizations</div><div class="empty-sub">Create your first organization to get started</div></div>`;
+                return;
+            }
+            grid.innerHTML = state.orgs.map(o => `
+    <div class="card">
+      <div class="card-title">${escHtml(o.name)} <span style="font-size:11px;color:var(--text-dim);font-weight:400;">#${o.id}</span></div>
+      <div class="card-meta">
+        <span>Owner ID: ${o.owner_id}</span>
+        <span>${fmtDate(o.created_at)}</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-sm btn-edit" onclick="openEditOrg(${o.id})">Edit</button>
+      </div>
+    </div>
+  `).join('');
+        }
+
+        function openModal(type) {
+            if (type === 'project') populateOrgSelect('project-org');
+            if (type === 'task') populateProjectSelect('task-project');
+            if (type === 'member') populateOrgSelect('member-org');
+            document.getElementById(`modal-${type}`).classList.add('open');
+        }
+
+        function closeModal(type) {
+            document.getElementById(`modal-${type}`).classList.remove('open');
+        }
+
+        function populateOrgSelect(selectId) {
+            const sel = document.getElementById(selectId);
+            sel.innerHTML = state.orgs.map(o => `<option value="${o.id}">${escHtml(o.name)}</option>`).join('') || '<option value="">No organizations</option>';
+        }
+
+        function populateProjectSelect(selectId) {
+            const sel = document.getElementById(selectId);
+            sel.innerHTML = state.projects.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('') || '<option value="">No projects</option>';
+        }
+
+        function openEditOrgModal(org) {
+            document.getElementById('org-modal-title').textContent = "Edit Organization";
+            document.getElementById('org-edit-id').value = org.id;
+            document.getElementById('org-name').value = org.name;
+            document.getElementById('org-slug').value = org.slug;
+
+            // Add this line to fill the description when editing
+            document.getElementById('org-description').value = org.description || "";
+
+            document.getElementById('modal-org').classList.add('active');
+        }
+
+        async function saveOrg() {
+            console.log("Save process started...");
+
+            const nameEl = document.getElementById('org-name');
+            const slugEl = document.getElementById('org-slug');
+            const descEl = document.getElementById('org-description');
+            const editIdEl = document.getElementById('org-edit-id');
+            const errorEl = document.getElementById('org-error');
+
+            if (!nameEl || !slugEl || !descEl || !errorEl) {
+                console.error("Missing HTML IDs. Check your modal code.");
+                return;
+            }
+
+            errorEl.style.display = 'none';
+            errorEl.textContent = "";
+
+            // MATCHING YOUR setTokens KEY: 'tf_token'
+            const token = localStorage.getItem('tf_token');
+
+            if (!token) {
+                errorEl.textContent = "Auth Error: No active session. Please login again.";
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const name = nameEl.value.trim();
+            const slug = slugEl.value.trim();
+            const description = descEl.value.trim();
+            const editId = editIdEl ? editIdEl.value : null;
+
+            if (!name || !slug) {
+                errorEl.textContent = "Name and Slug are required.";
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const payload = { name, slug, description };
+            const url = editId ? `/organizations/${editId}` : '/organizations/';
+            const method = editId ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    // Check for the specific "credentials" error from backend
+                    const msg = result.detail || "Failed to save organization";
+                    throw new Error(msg);
+                }
+
+                console.log("Success:", result);
+                if (typeof closeModal === 'function') closeModal('org');
+
+                if (typeof loadOrgs === 'function') {
+                    await loadOrgs();
+                } else {
+                    location.reload();
+                }
+
+            } catch (err) {
+                console.error("Save error:", err);
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        // ===================================================
+        // PROJECTS
+        // ===================================================
+        async function loadProjects() {
+            // load projects for all orgs
+            state.projects = [];
+            for (const org of state.orgs) {
+                // API doesn't expose list projects endpoint, we store what we create
+            }
+        }
+
+        function renderProjects() {
+            const grid = document.getElementById('projects-grid');
+            if (!state.projects.length) {
+                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📁</div><div class="empty-title">No Projects</div><div class="empty-sub">Create a project inside an organization</div></div>`;
+                return;
+            }
+            grid.innerHTML = state.projects.map(p => `
+    <div class="card">
+      <div class="card-title">${escHtml(p.name)} <span style="font-size:11px;color:var(--text-dim);font-weight:400;">#${p.id}</span></div>
+      <div class="card-meta">
+        <span>Org ID: ${p.organization_id}</span>
+        <span>By: ${p.created_by}</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-sm btn-edit" onclick="openEditProject(${p.id})">Edit</button>
+        <button class="btn-sm btn-del" onclick="deleteProject(${p.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+        }
+
+        function openEditProject(id) {
+            const p = state.projects.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('project-edit-id').value = id;
+            document.getElementById('project-name').value = p.name;
+            populateOrgSelect('project-org');
+            document.getElementById('project-org').value = p.organization_id;
+            document.getElementById('project-modal-title').textContent = 'Edit Project';
+            document.getElementById('modal-project').classList.add('open');
+        }
+
+        async function saveProject() {
+            const name = document.getElementById('project-name').value.trim();
+            const org_id = parseInt(document.getElementById('project-org').value);
+            const editId = document.getElementById('project-edit-id').value;
+            if (!name) return showModalError('project', 'Name is required');
+            if (!org_id) return showModalError('project', 'Select an organization');
+            try {
+                if (editId) {
+                    const updated = await api('PUT', `/projects/${editId}`, { name });
+                    const idx = state.projects.findIndex(x => x.id === parseInt(editId));
+                    if (idx >= 0) state.projects[idx] = { ...state.projects[idx], ...updated };
+                    showToast('Project updated!');
+                } else {
+                    const proj = await api('POST', '/projects/', { name, organization_id: org_id });
+                    state.projects.push(proj);
+                    showToast('Project created!');
+                }
+                closeModal('project');
+                document.getElementById('project-name').value = '';
+                document.getElementById('project-edit-id').value = '';
+                document.getElementById('project-modal-title').textContent = 'New Project';
+                renderProjects();
+                updateStats();
+            } catch (e) {
+                showModalError('project', e.message);
+            }
+        }
+
+        async function deleteProject(id) {
+            if (!confirm('Delete this project?')) return;
+            try {
+                await api('DELETE', `/projects/${id}`);
+                state.projects = state.projects.filter(p => p.id !== id);
+                renderProjects();
+                updateStats();
+                showToast('Project deleted.');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        // ===================================================
+        // TASKS
+        // ===================================================
+        async function loadTasks() {
+            // Tasks are per-project; we load them from what we create/cache
+            state.tasks = JSON.parse(sessionStorage.getItem('tf_tasks') || '[]');
+        }
+
+        function saveCachedTasks() {
+            sessionStorage.setItem('tf_tasks', JSON.stringify(state.tasks));
+        }
+
+        function renderTasks() {
+            const list = document.getElementById('tasks-list');
+            if (!state.tasks.length) {
+                list.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">No Tasks Yet</div><div class="empty-sub">Create tasks inside your projects</div></div>`;
+                return;
+            }
+            list.innerHTML = state.tasks.map(t => `
+    <div class="task-item">
+      <div class="task-info">
+        <div class="task-title-row">
+          <span class="task-name">${escHtml(t.title)}</span>
+          ${badge(t.status)} ${badge(t.priority)}
+          ${t.due_date ? `<span style="font-size:12px;color:var(--text-muted)">📅 ${fmtDate(t.due_date)}</span>` : ''}
+        </div>
+        ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
+      </div>
+      <div class="task-actions">
+        <button class="btn-sm btn-edit" onclick="openEditTask(${t.id})">Edit</button>
+        <button class="btn-sm" style="background:rgba(108,99,255,0.1);color:var(--accent);" onclick="openCommentModal(${t.id})">💬</button>
+        <button class="btn-sm btn-del" onclick="deleteTask(${t.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+        }
+
+        function openEditTask(id) {
+            const t = state.tasks.find(x => x.id === id);
+            if (!t) return;
+            document.getElementById('task-edit-id').value = id;
+            document.getElementById('task-title').value = t.title;
+            document.getElementById('task-desc').value = t.description || '';
+            populateProjectSelect('task-project');
+            document.getElementById('task-project').value = t.project_id;
+            document.getElementById('task-priority').value = t.priority || 'Medium';
+            document.getElementById('task-status').value = t.status || 'Pending';
+            document.getElementById('task-due').value = t.due_date ? t.due_date.slice(0, 16) : '';
+            document.getElementById('task-assigned').value = t.assigned_to || '';
+            document.getElementById('task-modal-title').textContent = 'Edit Task';
+            document.getElementById('modal-task').classList.add('open');
+        }
+
+        async function saveTask() {
+            const title = document.getElementById('task-title').value.trim();
+            const description = document.getElementById('task-desc').value.trim();
+            const project_id = parseInt(document.getElementById('task-project').value);
+            const priority = document.getElementById('task-priority').value;
+            const status = document.getElementById('task-status').value;
+            const due_date = document.getElementById('task-due').value || null;
+            const assigned_to = document.getElementById('task-assigned').value ? parseInt(document.getElementById('task-assigned').value) : null;
+            const editId = document.getElementById('task-edit-id').value;
+            if (!title) return showModalError('task', 'Title is required');
+            if (!project_id) return showModalError('task', 'Select a project');
+            try {
+                const payload = { title, description, priority, status, due_date: due_date ? new Date(due_date).toISOString() : null, assigned_to };
+                if (editId) {
+                    const updated = await api('PUT', `/tasks/${editId}`, payload);
+                    const idx = state.tasks.findIndex(x => x.id === parseInt(editId));
+                    if (idx >= 0) state.tasks[idx] = { ...state.tasks[idx], ...updated };
+                    showToast('Task updated!');
+                } else {
+                    const task = await api('POST', '/tasks/', { ...payload, project_id });
+                    state.tasks.push(task);
+                    showToast('Task created!');
+                }
+                saveCachedTasks();
+                closeModal('task');
+                // Reset form
+                ['task-title', 'task-desc', 'task-due', 'task-assigned'].forEach(id => document.getElementById(id).value = '');
+                document.getElementById('task-edit-id').value = '';
+                document.getElementById('task-modal-title').textContent = 'New Task';
+                renderTasks();
+                updateStats();
+            } catch (e) {
+                showModalError('task', e.message);
+            }
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('Delete this task?')) return;
+            try {
+                await api('DELETE', `/tasks/${id}`);
+                state.tasks = state.tasks.filter(t => t.id !== id);
+                saveCachedTasks();
+                renderTasks();
+                updateStats();
+                showToast('Task deleted.');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        // ===================================================
+        // COMMENTS
+        // ===================================================
+        function openCommentModal(taskId) {
+            document.getElementById('comment-task-id').value = taskId;
+            document.getElementById('comment-content').value = '';
+            document.getElementById('modal-comment').classList.add('open');
+        }
+
+        async function saveComment() {
+            const task_id = parseInt(document.getElementById('comment-task-id').value);
+            const content = document.getElementById('comment-content').value.trim();
+            if (!content) return showModalError('comment', 'Content is required');
+            try {
+                await api('POST', '/comments/', { task_id, content });
+                closeModal('comment');
+                showToast('Comment posted!');
+            } catch (e) {
+                showModalError('comment', e.message);
+            }
+        }
+
+        // ===================================================
+        // MEMBERS
+        // ===================================================
+        function renderMembers() {
+            const grid = document.getElementById('members-grid');
+            if (!state.members.length) {
+                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">👥</div><div class="empty-title">No Members Added</div><div class="empty-sub">Add members to your organizations</div></div>`;
+                return;
+            }
+            grid.innerHTML = state.members.map(m => `
+    <div class="card">
+      <div class="card-title">User #${m.user_id}</div>
+      <div class="card-meta">
+        <span>Org #${m.organization_id}</span>
+        ${badge(m.role)}
+      </div>
+    </div>
+  `).join('');
+        }
+
+        async function saveMember() {
+            const user_id = parseInt(document.getElementById('member-user').value);
+            const organization_id = parseInt(document.getElementById('member-org').value);
+            const role = document.getElementById('member-role').value.trim();
+            if (!user_id) return showModalError('member', 'User ID is required');
+            if (!organization_id) return showModalError('member', 'Select an organization');
+            if (!role) return showModalError('member', 'Role is required');
+            try {
+                const m = await api('POST', '/memberships/', { user_id, organization_id, role });
+                state.members.push(m);
+                closeModal('member');
+                renderMembers();
+                showToast('Member added!');
+            } catch (e) {
+                showModalError('member', e.message);
+            }
+        }
+
+        // ===================================================
+        // PROFILE
+        // ===================================================
+        function renderProfile() {
+            if (!state.user) return;
+            document.getElementById('profile-avatar').textContent = initials(state.user.name);
+            document.getElementById('profile-name').value = state.user.name;
+            document.getElementById('profile-email').value = state.user.email;
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('profile-name').value.trim();
+            const password = document.getElementById('profile-pass').value;
+            const payload = {};
+            if (name) payload.name = name;
+            if (password) payload.password = password;
+            try {
+                const updated = await api('PUT', `/users/${state.user.id}`, payload);
+                state.user = updated;
+                document.getElementById('nav-avatar').textContent = initials(updated.name);
+                document.getElementById('nav-name').textContent = updated.name;
+                showToast('Profile saved!');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        // ===================================================
+        // DASHBOARD
+        // ===================================================
+        function renderDashboard() {
+            updateStats();
+            // Recent tasks
+            const el = document.getElementById('dash-tasks');
+            const recent = [...state.tasks].slice(-5).reverse();
+            if (!recent.length) {
+                el.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">No Tasks Yet</div><div class="empty-sub">Go to Tasks to create your first task</div></div>`;
+                return;
+            }
+            el.innerHTML = `<div class="tasks-list">${recent.map(t => `
+    <div class="task-item">
+      <div class="task-info">
+        <div class="task-title-row">
+          <span class="task-name">${escHtml(t.title)}</span>
+          ${badge(t.status)} ${badge(t.priority)}
+        </div>
+        ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
+      </div>
+    </div>
+  `).join('')}</div>`;
+        }
+
+        function updateStats() {
+            document.getElementById('stat-orgs').textContent = state.orgs.length;
+            document.getElementById('stat-projects').textContent = state.projects.length;
+            document.getElementById('stat-tasks').textContent = state.tasks.length;
+            document.getElementById('stat-done').textContent = state.tasks.filter(t => t.status === 'Done').length;
+        }
+
+        // ===================================================
+        // MODAL ERROR
+        // ===================================================
+        function showModalError(modal, msg) {
+            const el = document.getElementById(`${modal}-error`);
+            if (!el) return;
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 4000);
+        }
+
+        // ===================================================
+        // SECURITY
+        // ===================================================
+        function escHtml(s) {
+            if (!s) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // ===================================================
+        // CLOSE MODALS ON OVERLAY CLICK
+        // ===================================================
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', e => {
+                if (e.target === overlay) overlay.classList.remove('open');
+            });
+        });
+
+        // ===================================================
+        // INIT
+        // ===================================================
+        (async function init() {
+            if (state.token) {
+                await loadApp();
+            }
+        })();
+    </script>
+</body>
+
+</html>
