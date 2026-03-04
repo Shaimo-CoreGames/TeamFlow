@@ -65,3 +65,45 @@ class OrganizationService:
             .where(Membership.user_id == str(user.id)) 
         )
         return result.scalars().all()
+        
+    @staticmethod
+    async def update_organization(db: AsyncSession, org_id: str, org_data: OrganizationCreate, current_user):
+        # 1. Find the org and explicitly load projects using selectinload
+        result = await db.execute(
+            select(Organization)
+            .options(selectinload(Organization.projects)) # <--- ADD THIS
+            .where(Organization.id == org_id, Organization.owner_id == str(current_user.id))
+        )
+        org = result.scalar_one_or_none()
+        
+        if not org:
+            raise HTTPException(status_code=404, detail="Organization not found or access denied")
+
+        # 2. Update fields
+        org.name = org_data.name
+        org.slug = org_data.slug
+        org.description = org_data.description
+        
+        try:
+            await db.commit()
+            # 3. Refresh to make sure everything is in sync
+            await db.refresh(org, attribute_names=["projects"]) 
+            return org
+        except Exception as e:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+        
+    @staticmethod
+    async def delete_organization(db: AsyncSession, org_id: str, current_user):
+        # Find the org and ensure the current user is the owner
+        result = await db.execute(
+            select(Organization).where(Organization.id == org_id, Organization.owner_id == current_user.id)
+        )
+        org = result.scalar_one_or_none()
+
+        if not org:
+            raise HTTPException(status_code=404, detail="Organization not found or access denied")
+
+        # Delete the organization (cascading projects depends on your DB relationship config)
+        await db.delete(org)
+        await db.commit()
