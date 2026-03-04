@@ -1,8 +1,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from app.models.membership import UserRole
+from app.schemas.project_schema import ProjectResponse
 
 class OrgBase(BaseModel):
     name: str
@@ -13,12 +14,13 @@ class OrganizationCreate(OrgBase):
     pass
 
 class OrgRead(OrgBase):
-    id: UUID
-    owner_id: UUID
+    id: str  # Change from UUID to str
+    owner_id: str  # Change from UUID to str
     created_at: datetime
+    projects: List[ProjectResponse] = []
     
     model_config = ConfigDict(from_attributes=True)
 
 class OrgMemberAdd(BaseModel):
-    user_id: UUID
+    user_id: str
     role: str = "Members"

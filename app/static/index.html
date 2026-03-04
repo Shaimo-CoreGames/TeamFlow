@@ -1009,6 +1009,7 @@
                     </div>
                     <button class="btn-add" onclick="openModal('project')">＋ New Project</button>
                 </div>
+                <div class="cards-grid" id="projects-grid"></div>
             </div>
 
             <!-- TASKS VIEW -->
@@ -1541,28 +1542,49 @@
             const grid = document.getElementById('orgs-grid');
             if (!grid) return;
 
-            if (state.orgs.length === 0) {
-                grid.innerHTML = `<div class="empty-state">No organizations found.</div>`;
+            if (!state.orgs || state.orgs.length === 0) {
+                grid.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <div class="empty-title">No organizations found.</div>
+                <div class="empty-sub">Create one to start managing your projects.</div>
+            </div>`;
                 return;
             }
 
-            grid.innerHTML = state.orgs.map(o => `
-        <div class="card" onclick="enterOrganization('${o.id}', '${o.name}')" style="cursor:pointer">
-            <div class="card-title">
-                ${o.name}
-                <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
-            </div>
-            <div class="card-meta">
-                <span>Owner: ${o.owner_id ? o.owner_id.substring(0, 8) : 'You'}</span>
-                <span>${new Date(o.created_at).toLocaleDateString()}</span>
-            </div>
-            <div class="card-actions">
-                <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editOrg('${o.id}')">Edit</button>
-            </div>
-        </div>
-    `).join('');
-        }
+            grid.innerHTML = state.orgs.map(o => {
+                // Create the HTML for projects if they exist
+                const projectsHtml = o.projects && o.projects.length > 0
+                    ? o.projects.map(p => `
+                <span class="badge badge-progress" style="margin-right: 4px; margin-bottom: 4px;">
+                    ${p.name}
+                </span>
+              `).join('')
+                    : '<span style="color: var(--text-dim); font-size: 12px;">No projects yet</span>';
 
+                return `
+            <div class="card" onclick="enterOrganization('${o.id}', '${o.name}')" style="cursor:pointer">
+                <div class="card-title">
+                    ${o.name}
+                    <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
+                </div>
+                
+                <div style="margin: 12px 0; display: flex; flex-wrap: wrap;">
+                    ${projectsHtml}
+                </div>
+
+                <div class="card-meta">
+                    <span>Slug: <strong>${o.slug}</strong></span>
+                    <span>Created: ${new Date(o.created_at).toLocaleDateString()}</span>
+                </div>
+                <div class="card-actions">
+                    <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editOrg('${o.id}')">Edit</button>
+                    <button class="btn-sm btn-del" onclick="event.stopPropagation(); deleteOrg('${o.id}')">Delete</button>
+                </div>
+            </div>
+        `;
+            }).join('');
+        }
         function openModal(type) {
             const modal = document.getElementById(`modal-${type}`);
             if (!modal) return;
@@ -1696,16 +1718,50 @@
         // ===================================================
         // PROJECTS
         // ===================================================
+        function renderProjects() {
+            const grid = document.getElementById('projects-grid');
+            if (!grid) return;
+
+            // Use the projects we just saved to state in loadProjects()
+            const projects = state.projects || [];
+
+            if (projects.length === 0) {
+                grid.innerHTML = `<div class="empty-state">No projects found in this organization.</div>`;
+                return;
+            }
+
+            grid.innerHTML = projects.map(p => `
+        <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer">
+            <div class="card-title">
+                ${p.name}
+                <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
+            </div>
+            <div class="card-meta">
+                <span>Created: ${new Date(p.created_at).toLocaleDateString()}</span>
+            </div>
+            <div class="card-actions">
+                <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editProject('${p.id}')">Edit</button>
+            </div>
+        </div>
+    `).join('');
+        }
+
         async function loadProjects(orgId) {
             try {
                 // Fetch projects specifically for the open organization
                 const projects = await api('GET', `/organizations/${orgId}/projects`);
+
+                // Save to global state so other functions can access it
                 state.projects = projects;
+
+                // Now tell the UI to draw the cards
                 renderProjects();
             } catch (e) {
+                console.error(e);
                 showToast('Error loading projects', 'error');
             }
         }
+
 
         async function saveProject() {
             const nameEl = document.getElementById('project-name');

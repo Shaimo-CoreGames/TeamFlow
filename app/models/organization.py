@@ -32,4 +32,4 @@ class Organization(Base):
 
     # Relationships
     memberships = relationship("Membership", back_populates="organization", cascade="all, delete")
-    projects = relationship("Project", back_populates="organization", cascade="all, delete")
+    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")

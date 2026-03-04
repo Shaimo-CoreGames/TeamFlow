@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
@@ -51,7 +53,7 @@ async def update_project(
 
 
 @router.delete(
-    "/{project_id}",
+    "/projects/{project_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_project(
@@ -64,3 +66,12 @@ async def delete_project(
         project_id=project_id,
         user=current_user,
     )
+
+@router.get("/organizations/{org_id}/projects", response_model=List[ProjectResponse])
+async def list_projects(
+    org_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # This connects the Route to the Service you just fixed!
+    return await ProjectService.get_organization_projects(db, org_id)

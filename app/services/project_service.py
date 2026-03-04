@@ -89,3 +89,28 @@ class ProjectService:
         await db.delete(project)
         await db.commit()
 
+    @staticmethod
+    async def get_organization_projects(
+        db: AsyncSession,
+        org_id: str, # Or uuid.UUID
+    ):
+        result = await db.execute(
+            select(Project).where(
+                Project.organization_id == str(org_id) # <--- Force to string
+            )
+        )
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_organization_projects(
+        db: AsyncSession,
+        org_id: str, # This comes from the FastAPI route
+    ):
+        # We must cast org_id to str() to match the String(36) column in SQLite
+        result = await db.execute(
+            select(Project).where(
+                Project.organization_id == str(org_id)
+            )
+        )
+        projects = result.scalars().all()
+        return projects

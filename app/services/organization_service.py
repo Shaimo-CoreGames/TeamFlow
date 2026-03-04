@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.organization import Organization
@@ -17,7 +18,12 @@ class OrganizationService:
         owner: User,
     ) -> Organization:
         
-        # ... (slug check logic remains the same) ...
+        slug_check = await db.execute(select(Organization).where(Organization.slug == org_data.slug))
+        if slug_check.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Organization slug '{org_data.slug}' is already taken."
+            )
 
         org = Organization(
             name=org_data.name,
@@ -38,21 +44,24 @@ class OrganizationService:
         
         try:
             await db.commit()
-            # 1. Force a refresh to load database-generated fields like created_at
-            await db.refresh(org) 
+            # Update the refresh to include the projects relationship
+            await db.refresh(org, attribute_names=["projects"]) 
             return org
         except Exception as e:
             await db.rollback()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")  
+        
     @staticmethod
     async def get_user_organizations(
         db: AsyncSession,
         user: User,
     ):
-        # Force user.id to string to match the String(36) column in SQLite
+        # 1. We join Membership to find which orgs the user belongs to
+        # 2. We use selectinload to fetch the projects for those orgs
         result = await db.execute(
             select(Organization)
             .join(Membership)
+            .options(selectinload(Organization.projects)) # <--- CRITICAL FIX
             .where(Membership.user_id == str(user.id)) 
         )
         return result.scalars().all()

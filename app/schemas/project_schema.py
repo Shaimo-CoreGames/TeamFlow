@@ -32,8 +32,8 @@ class ProjectUpdate(BaseModel):
 # ==============================
 
 class ProjectResponse(ProjectBase):
-    id: uuid.UUID
-    organization_id: uuid.UUID
-    created_by: uuid.UUID
+    id: str
+    organization_id: str
+    created_by: str
 
     model_config = ConfigDict(from_attributes=True)
