@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -14,7 +16,7 @@ class ProjectBase(BaseModel):
 # ==============================
 
 class ProjectCreate(ProjectBase):
-    organization_id: int
+    pass
 
 
 # ==============================
@@ -30,8 +32,8 @@ class ProjectUpdate(BaseModel):
 # ==============================
 
 class ProjectResponse(ProjectBase):
-    id: int
-    organization_id: int
-    created_by: int
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    created_by: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)

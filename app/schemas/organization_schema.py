@@ -14,10 +14,11 @@ class OrganizationCreate(OrgBase):
 
 class OrgRead(OrgBase):
     id: UUID
+    owner_id: UUID
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
 class OrgMemberAdd(BaseModel):
     user_id: UUID
-    role: UserRole = UserRole.MEMBER
+    role: str = "Members"

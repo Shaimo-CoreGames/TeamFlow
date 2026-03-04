@@ -1,24 +1,35 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey # Added ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from sqlalchemy import String, Text, DateTime
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.database import Base
+
 
 class Organization(Base):
     __tablename__ = "organizations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)
-    slug = Column(String, unique=True, index=True, nullable=False)
-    description = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # ADD THIS COLUMN
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # 1. Change id to String(36)
+    id: Mapped[str] = mapped_column(
+        String(36), 
+        primary_key=True, 
+        default=lambda: str(uuid.uuid4())
+    )
 
-    # RELATIONSHIPS
-    memberships = relationship("Membership", back_populates="organization", cascade="all, delete-orphan")
-    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
-    # Optional: link back to owner
-    owner = relationship("User")
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+
+    # 2. Change owner_id to String(36)
+    owner_id: Mapped[str] = mapped_column(
+        String(36), 
+        nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now()
+    )
+
+    # Relationships
+    memberships = relationship("Membership", back_populates="organization", cascade="all, delete")
+    projects = relationship("Project", back_populates="organization", cascade="all, delete")

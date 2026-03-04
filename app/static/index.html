@@ -997,12 +997,18 @@
             <div id="view-projects" class="view">
                 <div class="page-header">
                     <div>
-                        <div class="page-title">Projects</div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px;">
+                            <span style="color: var(--accent); cursor: pointer; font-weight: 600;"
+                                onclick="showView('orgs')">Organizations</span>
+                            <span style="color: var(--text-dim);">/</span>
+                            <span id="breadcrumb-org-name" style="color: var(--text-muted);">Select an
+                                Organization</span>
+                        </div>
+                        <div class="page-title" id="project-section-title">Projects</div>
                         <div class="page-sub">Track your work across organizations</div>
                     </div>
                     <button class="btn-add" onclick="openModal('project')">＋ New Project</button>
                 </div>
-                <div class="cards-grid" id="projects-grid"></div>
             </div>
 
             <!-- TASKS VIEW -->
@@ -1104,16 +1110,22 @@
                 <div class="modal-title" id="project-modal-title">New Project</div>
                 <button class="modal-close" onclick="closeModal('project')">×</button>
             </div>
+
             <div class="modal-error" id="project-error"></div>
             <input type="hidden" id="project-edit-id" />
+
+            <div class="form-group">
+                <label class="form-label">Creating in Organization</label>
+                <input type="text" id="display-current-org" class="form-input"
+                    style="background: var(--surface2); color: var(--accent); font-weight: 600; cursor: not-allowed;"
+                    readonly />
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Project Name</label>
                 <input type="text" id="project-name" class="form-input" placeholder="Website Redesign" />
             </div>
-            <div class="form-group">
-                <label class="form-label">Organization</label>
-                <select id="project-org" class="form-input"></select>
-            </div>
+
             <button class="btn-primary" onclick="saveProject()">Save Project</button>
         </div>
     </div>
@@ -1231,6 +1243,9 @@
             projects: [],
             tasks: [],
             members: [],
+            currentOrgId: null,      // Tracks the "Active Workspace"
+            currentProjectId: null,  // Tracks the "Active Project"
+            currentOrgName: null
         };
 
         // ===================================================
@@ -1460,8 +1475,11 @@
             document.getElementById('nav-avatar').textContent = initials(state.user.name);
             document.getElementById('nav-name').textContent = state.user.name;
 
-            // Load data
-            await Promise.allSettled([loadOrgs(), loadProjects(), loadTasks()]);
+            // Load ONLY the organizations first
+            await loadOrgs();
+
+            // Redirect user to the dashboard view by default
+            showView('dashboard');
             renderDashboard();
         }
 
@@ -1484,41 +1502,95 @@
         // ===================================================
         // ORGS
         // ===================================================
+        function enterOrganization(id, name) {
+            // 1. Set the global context
+            state.currentOrgId = id;
+            state.currentOrgName = name;
+
+            // 2. Update Breadcrumb and Title
+            const breadcrumb = document.getElementById('breadcrumb-org-name');
+            const title = document.getElementById('project-section-title');
+
+            if (breadcrumb) breadcrumb.textContent = name;
+            if (title) title.textContent = `Projects in ${name}`;
+
+            // 3. Switch View and Load Data
+            showView('projects');
+            loadProjects(id);
+        }
         async function loadOrgs() {
             try {
-                state.orgs = await api('GET', '/organizations/');
-            } catch { state.orgs = []; }
+                const data = await api('GET', '/organizations/');
+                state.orgs = data;
+
+                // ADD THIS: If we are already "inside" an org, verify it still exists
+                // or clear the context if it was deleted.
+                if (state.orgs.length === 0) {
+                    currentContext.orgId = null;
+                }
+
+                renderOrgs(); // Ensure you call render after updating state
+            } catch (e) {
+                console.error("Failed to load orgs:", e);
+                state.orgs = [];
+                renderOrgs();
+            }
         }
 
         function renderOrgs() {
             const grid = document.getElementById('orgs-grid');
-            if (!state.orgs.length) {
-                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🏢</div><div class="empty-title">No Organizations</div><div class="empty-sub">Create your first organization to get started</div></div>`;
+            if (!grid) return;
+
+            if (state.orgs.length === 0) {
+                grid.innerHTML = `<div class="empty-state">No organizations found.</div>`;
                 return;
             }
+
             grid.innerHTML = state.orgs.map(o => `
-    <div class="card">
-      <div class="card-title">${escHtml(o.name)} <span style="font-size:11px;color:var(--text-dim);font-weight:400;">#${o.id}</span></div>
-      <div class="card-meta">
-        <span>Owner ID: ${o.owner_id}</span>
-        <span>${fmtDate(o.created_at)}</span>
-      </div>
-      <div class="card-actions">
-        <button class="btn-sm btn-edit" onclick="openEditOrg(${o.id})">Edit</button>
-      </div>
-    </div>
-  `).join('');
+        <div class="card" onclick="enterOrganization('${o.id}', '${o.name}')" style="cursor:pointer">
+            <div class="card-title">
+                ${o.name}
+                <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
+            </div>
+            <div class="card-meta">
+                <span>Owner: ${o.owner_id ? o.owner_id.substring(0, 8) : 'You'}</span>
+                <span>${new Date(o.created_at).toLocaleDateString()}</span>
+            </div>
+            <div class="card-actions">
+                <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editOrg('${o.id}')">Edit</button>
+            </div>
+        </div>
+    `).join('');
         }
 
         function openModal(type) {
-            if (type === 'project') populateOrgSelect('project-org');
+            const modal = document.getElementById(`modal-${type}`);
+            if (!modal) return;
+
+            // Handle the Project Modal Logic
+            if (type === 'project') {
+                // 1. Prevent opening if no organization is selected
+                if (!state.currentOrgId) {
+                    showToast('Please select an organization first!', 'error');
+                    return;
+                }
+                // 2. Set the text of our new read-only display field
+                const displayEl = document.getElementById('display-current-org');
+                if (displayEl) {
+                    displayEl.value = state.currentOrgName || "Current Workspace";
+                }
+            }
+
+            // Handle other types (Optional: if you still have dropdowns for these)
             if (type === 'task') populateProjectSelect('task-project');
             if (type === 'member') populateOrgSelect('member-org');
-            document.getElementById(`modal-${type}`).classList.add('open');
+
+            modal.classList.add('open');
         }
 
         function closeModal(type) {
-            document.getElementById(`modal-${type}`).classList.remove('open');
+            const modal = document.getElementById(`modal-${type}`);
+            if (modal) modal.classList.remove('open');
         }
 
         function populateOrgSelect(selectId) {
@@ -1556,12 +1628,12 @@
                 console.error("Missing HTML IDs. Check your modal code.");
                 return;
             }
-
+            // Reset UI
             errorEl.style.display = 'none';
             errorEl.textContent = "";
 
             // MATCHING YOUR setTokens KEY: 'tf_token'
-            const token = localStorage.getItem('tf_token');
+            const token = state.token;
 
             if (!token) {
                 errorEl.textContent = "Auth Error: No active session. Please login again.";
@@ -1597,8 +1669,11 @@
                 const result = await response.json();
 
                 if (!response.ok) {
-                    // Check for the specific "credentials" error from backend
-                    const msg = result.detail || "Failed to save organization";
+                    // Handle validation errors from FastAPI (the detail array)
+                    let msg = result.detail || "Failed to save organization";
+                    if (Array.isArray(result.detail)) {
+                        msg = result.detail.map(e => e.msg).join(", ");
+                    }
                     throw new Error(msg);
                 }
 
@@ -1621,33 +1696,41 @@
         // ===================================================
         // PROJECTS
         // ===================================================
-        async function loadProjects() {
-            // load projects for all orgs
-            state.projects = [];
-            for (const org of state.orgs) {
-                // API doesn't expose list projects endpoint, we store what we create
+        async function loadProjects(orgId) {
+            try {
+                // Fetch projects specifically for the open organization
+                const projects = await api('GET', `/organizations/${orgId}/projects`);
+                state.projects = projects;
+                renderProjects();
+            } catch (e) {
+                showToast('Error loading projects', 'error');
             }
         }
 
-        function renderProjects() {
-            const grid = document.getElementById('projects-grid');
-            if (!state.projects.length) {
-                grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📁</div><div class="empty-title">No Projects</div><div class="empty-sub">Create a project inside an organization</div></div>`;
-                return;
+        async function saveProject() {
+            const nameEl = document.getElementById('project-name');
+            const name = nameEl.value.trim();
+
+            // Automatically pull from state
+            const orgId = state.currentOrgId;
+
+            if (!name) return showModalError('project', 'Project name is required');
+            if (!orgId) return showModalError('project', 'Please select an organization first');
+
+            try {
+                // Use the nested API path
+                const url = `/organizations/${orgId}/projects`;
+                await api('POST', url, { name });
+
+                showToast(`Project created in ${state.currentOrgName}`);
+                closeModal('project');
+
+                // Reset and Refresh
+                nameEl.value = '';
+                loadProjects(orgId);
+            } catch (e) {
+                showModalError('project', e.message);
             }
-            grid.innerHTML = state.projects.map(p => `
-    <div class="card">
-      <div class="card-title">${escHtml(p.name)} <span style="font-size:11px;color:var(--text-dim);font-weight:400;">#${p.id}</span></div>
-      <div class="card-meta">
-        <span>Org ID: ${p.organization_id}</span>
-        <span>By: ${p.created_by}</span>
-      </div>
-      <div class="card-actions">
-        <button class="btn-sm btn-edit" onclick="openEditProject(${p.id})">Edit</button>
-        <button class="btn-sm btn-del" onclick="deleteProject(${p.id})">Delete</button>
-      </div>
-    </div>
-  `).join('');
         }
 
         function openEditProject(id) {
@@ -1662,26 +1745,44 @@
         }
 
         async function saveProject() {
-            const name = document.getElementById('project-name').value.trim();
-            const org_id = parseInt(document.getElementById('project-org').value);
-            const editId = document.getElementById('project-edit-id').value;
-            if (!name) return showModalError('project', 'Name is required');
-            if (!org_id) return showModalError('project', 'Select an organization');
+            const nameEl = document.getElementById('project-name');
+            const editIdEl = document.getElementById('project-edit-id');
+
+            const name = nameEl.value.trim();
+            const editId = editIdEl ? editIdEl.value : null;
+
+            // 1. Get the ID from the application state, not the user
+            const orgId = state.currentOrgId;
+
+            if (!name) return showModalError('project', 'Project name is required');
+
+            // Safety check: Ensure the user has actually "entered" an organization
+            if (!orgId && !editId) {
+                return showModalError('project', 'Please select an organization first');
+            }
+
             try {
                 if (editId) {
+                    // PUT remains flat because project IDs are unique
                     const updated = await api('PUT', `/projects/${editId}`, { name });
-                    const idx = state.projects.findIndex(x => x.id === parseInt(editId));
+                    const idx = state.projects.findIndex(x => x.id === editId);
                     if (idx >= 0) state.projects[idx] = { ...state.projects[idx], ...updated };
                     showToast('Project updated!');
                 } else {
-                    const proj = await api('POST', '/projects/', { name, organization_id: org_id });
+                    // 2. Use the nested Production URL
+                    // We no longer send organization_id in the JSON body; it's in the URL
+                    const proj = await api('POST', `/organizations/${orgId}/projects`, { name });
                     state.projects.push(proj);
                     showToast('Project created!');
                 }
+
+                // 3. Cleanup UI
                 closeModal('project');
-                document.getElementById('project-name').value = '';
-                document.getElementById('project-edit-id').value = '';
+                nameEl.value = '';
+                editIdEl.value = '';
                 document.getElementById('project-modal-title').textContent = 'New Project';
+
+                // Refresh the list for the current organization
                 renderProjects();
                 updateStats();
             } catch (e) {

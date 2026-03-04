@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
-
+import uuid
 from app.models.project import Project
 from app.models.membership import Membership
 from app.schemas.project_schema import ProjectCreate, ProjectUpdate
@@ -13,6 +13,7 @@ class ProjectService:
     @staticmethod
     async def create_project(
         db: AsyncSession,
+        org_id: uuid.UUID,
         project_data: ProjectCreate,
         user: User,
     ) -> Project:
@@ -20,8 +21,8 @@ class ProjectService:
         # Ensure user belongs to organization
         result = await db.execute(
             select(Membership).where(
-                Membership.organization_id == project_data.organization_id,
-                Membership.user_id == user.id,
+                Membership.organization_id == str(org_id), # Force to string
+                Membership.user_id == str(user.id),
             )
         )
         membership = result.scalar_one_or_none()
@@ -33,9 +34,10 @@ class ProjectService:
             )
 
         project = Project(
+            id=str(uuid.uuid4()),            # Explicit string
             name=project_data.name,
-            organization_id=project_data.organization_id,
-            created_by=user.id,
+            organization_id=str(org_id),     # Explicit string
+            created_by=str(user.id),         # Explicit string
         )
 
         db.add(project)
@@ -44,17 +46,18 @@ class ProjectService:
 
         return project
 
+
     @staticmethod
     async def update_project(
         db: AsyncSession,
-        project_id: int,
+        project_id: uuid.UUID,
         project_data: ProjectUpdate,
         user: User,
     ) -> Project:
 
         result = await db.execute(
             select(Project).where(Project.id == project_id)
-        )
+        ) 
         project = result.scalar_one_or_none()
 
         if not project:
@@ -68,10 +71,11 @@ class ProjectService:
 
         return project
 
+
     @staticmethod
     async def delete_project(
         db: AsyncSession,
-        project_id: int,
+        project_id: uuid.UUID,
         user: User,
     ):
         result = await db.execute(
@@ -84,3 +88,4 @@ class ProjectService:
 
         await db.delete(project)
         await db.commit()
+
