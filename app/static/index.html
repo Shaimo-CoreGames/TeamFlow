@@ -1626,8 +1626,22 @@
                 document.getElementById('org-slug').value = "";
                 document.getElementById('org-description').value = "";
             }
+            if (type === 'project') {
+                document.getElementById('project-modal-title').textContent = "New Project";
+                document.getElementById('project-edit-id').value = "";
+                document.getElementById('project-name').value = "";
+
+                // Populate the read-only "Organization" field from state
+                const displayOrgEl = document.getElementById('display-current-org');
+                if (displayOrgEl) {
+                    displayOrgEl.value = state.currentOrgName || "No Organization Selected";
+                }
+            }
             document.getElementById(`modal-${type}`).classList.add('active');
         }
+
+
+
         function closeModal(type) {
             const modal = document.getElementById(`modal-${type}`);
             if (modal) {
@@ -1770,7 +1784,7 @@
             const grid = document.getElementById('projects-grid');
             if (!grid) return;
 
-            // Use the projects we just saved to state in loadProjects()
+            // Use the projects saved in state from loadProjects()
             const projects = state.projects || [];
 
             if (projects.length === 0) {
@@ -1778,22 +1792,30 @@
                 return;
             }
 
-            grid.innerHTML = projects.map(p => `
-        <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer">
-            <div class="card-title">
-                ${p.name}
-                <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
-            </div>
-            <div class="card-meta">
-                <span>Created: ${new Date(p.created_at).toLocaleDateString()}</span>
-            </div>
-            <div class="card-actions">
-                <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editProject('${p.id}')">Edit</button>
-            </div>
-        </div>
-    `).join('');
-        }
+            grid.innerHTML = projects.map(p => {
+                // Robust Date Validation:
+                // 1. Check if p.created_at exists
+                // 2. Check if the resulting Date object is a valid timestamp
+                const dateObj = p.created_at ? new Date(p.created_at) : null;
+                const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                const dateStr = isValidDate ? dateObj.toLocaleDateString() : "Pending...";
 
+                return `
+            <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer">
+                <div class="card-title">
+                    ${p.name}
+                    <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
+                </div>
+                <div class="card-meta">
+                    <span>Created: <strong>${dateStr}</strong></span>
+                </div>
+                <div class="card-actions">
+                    <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editProject('${p.id}')">Edit</button>
+                </div>
+            </div>
+        `;
+            }).join('');
+        }
         async function loadProjects(orgId) {
             try {
                 // Fetch projects specifically for the open organization

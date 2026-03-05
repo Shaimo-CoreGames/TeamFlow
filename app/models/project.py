@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey
+from sqlalchemy import String, ForeignKey,DateTime,func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
 from app.database import Base
@@ -26,6 +26,10 @@ class Project(Base):
     created_by: Mapped[str] = mapped_column(
         ForeignKey("users.id"),
         nullable=False,
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now()
     )
 
     # Relationships

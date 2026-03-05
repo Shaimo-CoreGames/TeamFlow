@@ -1,7 +1,5 @@
-import uuid
-
 from pydantic import BaseModel, Field, ConfigDict
-
+from datetime import datetime
 
 # ==============================
 # Base
@@ -35,5 +33,6 @@ class ProjectResponse(ProjectBase):
     id: str
     organization_id: str
     created_by: str
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
