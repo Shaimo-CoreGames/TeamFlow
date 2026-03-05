@@ -31,6 +31,8 @@ class Project(Base):
         DateTime(timezone=True), 
         server_default=func.now()
     )
+    
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     organization = relationship("Organization", back_populates="projects")

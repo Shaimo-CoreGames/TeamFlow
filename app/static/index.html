@@ -1115,23 +1115,19 @@
     <div class="modal-overlay" id="modal-project">
         <div class="modal">
             <div class="modal-header">
-                <div class="modal-title" id="project-modal-title">New Project</div>
+                <div class="modal-title" id="project-modal-title">Project Details</div>
                 <button class="modal-close" onclick="closeModal('project')">×</button>
             </div>
-
-            <div class="modal-error" id="project-error"></div>
             <input type="hidden" id="project-edit-id" />
 
             <div class="form-group">
-                <label class="form-label">Creating in Organization</label>
-                <input type="text" id="display-current-org" class="form-input"
-                    style="background: var(--surface2); color: var(--accent); font-weight: 600; cursor: not-allowed;"
-                    readonly />
+                <label class="form-label">Project Name</label>
+                <input type="text" id="project-name" class="form-input" />
             </div>
 
             <div class="form-group">
-                <label class="form-label">Project Name</label>
-                <input type="text" id="project-name" class="form-input" placeholder="Website Redesign" />
+                <label class="form-label">Description</label>
+                <textarea id="project-description" class="form-input" rows="3"></textarea>
             </div>
 
             <button class="btn-primary" onclick="saveProject()">Save Project</button>
@@ -1784,7 +1780,6 @@
             const grid = document.getElementById('projects-grid');
             if (!grid) return;
 
-            // Use the projects saved in state from loadProjects()
             const projects = state.projects || [];
 
             if (projects.length === 0) {
@@ -1793,9 +1788,6 @@
             }
 
             grid.innerHTML = projects.map(p => {
-                // Robust Date Validation:
-                // 1. Check if p.created_at exists
-                // 2. Check if the resulting Date object is a valid timestamp
                 const dateObj = p.created_at ? new Date(p.created_at) : null;
                 const isValidDate = dateObj && !isNaN(dateObj.getTime());
                 const dateStr = isValidDate ? dateObj.toLocaleDateString() : "Pending...";
@@ -1807,10 +1799,13 @@
                     <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
                 </div>
                 <div class="card-meta">
+                    <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">
+                        ${p.description || "No description provided."}
+                    </p>
                     <span>Created: <strong>${dateStr}</strong></span>
                 </div>
                 <div class="card-actions">
-                    <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editProject('${p.id}')">Edit</button>
+                    <button class="btn-sm btn-edit" onclick="event.stopPropagation(); openEditProject('${p.id}')">Edit</button>
                 </div>
             </div>
         `;
@@ -1862,57 +1857,47 @@
         function openEditProject(id) {
             const p = state.projects.find(x => x.id === id);
             if (!p) return;
+
+            // Set hidden ID
             document.getElementById('project-edit-id').value = id;
+
+            // Fill inputs
             document.getElementById('project-name').value = p.name;
-            populateOrgSelect('project-org');
-            document.getElementById('project-org').value = p.organization_id;
+
+            // Handle the description field
+            const descEl = document.getElementById('project-description');
+            if (descEl) descEl.value = p.description || "";
+
+            // Set title and show modal
             document.getElementById('project-modal-title').textContent = 'Edit Project';
-            document.getElementById('modal-project').classList.add('open');
+
+            // Update org display
+            const displayOrgEl = document.getElementById('display-current-org');
+            if (displayOrgEl) displayOrgEl.value = state.currentOrgName || "";
+
+            document.getElementById('modal-project').classList.add('active');
         }
 
         async function saveProject() {
-            const nameEl = document.getElementById('project-name');
-            const editIdEl = document.getElementById('project-edit-id');
+            const name = document.getElementById('project-name').value.trim();
+            const description = document.getElementById('project-description').value.trim();
+            const editId = document.getElementById('project-edit-id').value;
 
-            const name = nameEl.value.trim();
-            const editId = editIdEl ? editIdEl.value : null;
+            if (!name) return alert("Name is required");
 
-            // 1. Get the ID from the application state, not the user
-            const orgId = state.currentOrgId;
-
-            if (!name) return showModalError('project', 'Project name is required');
-
-            // Safety check: Ensure the user has actually "entered" an organization
-            if (!orgId && !editId) {
-                return showModalError('project', 'Please select an organization first');
-            }
+            const method = editId ? 'PUT' : 'POST';
+            const url = editId ? `/projects/${editId}` : `/organizations/${state.currentOrgId}/projects`;
 
             try {
-                if (editId) {
-                    // PUT remains flat because project IDs are unique
-                    const updated = await api('PUT', `/projects/${editId}`, { name });
-                    const idx = state.projects.findIndex(x => x.id === editId);
-                    if (idx >= 0) state.projects[idx] = { ...state.projects[idx], ...updated };
-                    showToast('Project updated!');
-                } else {
-                    // 2. Use the nested Production URL
-                    // We no longer send organization_id in the JSON body; it's in the URL
-                    const proj = await api('POST', `/organizations/${orgId}/projects`, { name });
-                    state.projects.push(proj);
-                    showToast('Project created!');
-                }
+                // Send both name and description
+                await api(method, url, { name, description });
 
-                // 3. Cleanup UI
+                showToast(editId ? "Project updated" : "Project created");
                 closeModal('project');
-                nameEl.value = '';
-                editIdEl.value = '';
-                document.getElementById('project-modal-title').textContent = 'New Project';
-
-                // Refresh the list for the current organization
-                renderProjects();
-                updateStats();
+                loadProjects(state.currentOrgId);
             } catch (e) {
-                showModalError('project', e.message);
+                console.error(e);
+                alert(e.message);
             }
         }
 

@@ -18,23 +18,19 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "/organizations/{org_id}/projects",
-    response_model=ProjectResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/organizations/{org_id}/projects", response_model=ProjectResponse)
 async def create_project(
-    org_id: uuid.UUID,
-    project_data: ProjectCreate,
+    org_id: str, 
+    project_data: ProjectCreate, 
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
-    return await ProjectService.create_project(
-        db=db,
-        org_id=org_id,
-        project_data=project_data,
-        user=current_user,
+    # You MUST 'return' the result of the service call
+    new_project = await ProjectService.create_project(
+        db, uuid.UUID(org_id), project_data, current_user
     )
+    
+    return new_project
 
 
 @router.put("/projects/{project_id}", response_model=ProjectResponse)
