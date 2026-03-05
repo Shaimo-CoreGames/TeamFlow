@@ -1002,21 +1002,19 @@
 
             <!-- PROJECTS VIEW -->
             <div id="view-projects" class="view">
-                <div class="page-header">
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px;">
-                            <span style="color: var(--accent); cursor: pointer; font-weight: 600;"
-                                onclick="showView('orgs')">Organizations</span>
-                            <span style="color: var(--text-dim);">/</span>
-                            <span id="breadcrumb-org-name" style="color: var(--text-muted);">Select an
-                                Organization</span>
-                        </div>
-                        <div class="page-title" id="project-section-title">Projects</div>
-                        <div class="page-sub">Track your work across organizations</div>
-                    </div>
-                    <button class="btn-add" onclick="openModal('project')">＋ New Project</button>
+                <div class="view-header">
+                    <h2 id="current-org-title">Projects</h2>
+                    <p id="current-org-description"
+                        style="color: var(--text-dim); margin-top: 8px; font-size: 14px; max-width: 600px;"></p>
                 </div>
-                <div class="cards-grid" id="projects-grid"></div>
+
+                <div class="actions-bar" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+                    <button class="btn-primary" onclick="openModal('project')" style="width: auto; padding: 10px 20px;">
+                        + New Project
+                    </button>
+                </div>
+
+                <div id="projects-grid" class="grid"></div>
             </div>
 
             <!-- TASKS VIEW -->
@@ -1506,22 +1504,21 @@
         // ===================================================
         // ORGS
         // ===================================================
-        function enterOrganization(id, name) {
-            // 1. Set the global context
+        function enterOrganization(id, name, description) {
+            // 1. Save to state
             state.currentOrgId = id;
             state.currentOrgName = name;
+            state.currentOrgDescription = description || "No description available for this organization.";
 
-            // 2. Update Breadcrumb and Title
-            const breadcrumb = document.getElementById('breadcrumb-org-name');
-            const title = document.getElementById('project-section-title');
+            // 2. Update the UI Text
+            document.getElementById('current-org-title').textContent = name;
+            document.getElementById('current-org-description').textContent = state.currentOrgDescription;
 
-            if (breadcrumb) breadcrumb.textContent = name;
-            if (title) title.textContent = `Projects in ${name}`;
-
-            // 3. Switch View and Load Data
+            // 3. Switch view and load projects
             showView('projects');
             loadProjects(id);
         }
+
         async function loadOrgs() {
             try {
                 const data = await api('GET', '/organizations/');
@@ -1576,7 +1573,7 @@
             }
 
             grid.innerHTML = state.orgs.map(o => {
-                // Format the created_at date nicely
+                // 1. Format the Date
                 const dateStr = o.created_at
                     ? new Date(o.created_at).toLocaleDateString(undefined, {
                         year: 'numeric',
@@ -1585,24 +1582,37 @@
                     })
                     : 'Unknown';
 
+                // 2. Format Projects Badges
                 const projectsHtml = o.projects && o.projects.length > 0
                     ? o.projects.map(p => `<span class="badge badge-progress">${p.name}</span>`).join('')
                     : '<span class="text-dim">No projects</span>';
 
+                // 3. Escape strings for the onclick event to prevent errors with quotes
+                const escapedName = o.name.replace(/'/g, "\\'");
+                const escapedDesc = (o.description || "").replace(/'/g, "\\'");
+
                 return `
-            <div class="card" onclick="enterOrganization('${o.id}', '${o.name}')" style="cursor:pointer">
+            <div class="card" 
+                 onclick="enterOrganization('${o.id}', '${escapedName}', '${escapedDesc}')" 
+                 style="cursor:pointer">
+                
                 <div class="card-title">
                     ${o.name}
                     <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
                 </div>
                 
+                <p style="font-size: 12px; color: var(--text-dim); margin: 8px 0; line-height: 1.4;">
+                    ${o.description ? (o.description.substring(0, 60) + (o.description.length > 60 ? '...' : '')) : 'No description set.'}
+                </p>
+
                 <div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 4px;">
                     ${projectsHtml}
                 </div>
 
                 <div class="card-meta" style="display: flex; flex-direction: column; gap: 4px;">
                     <span>Slug: <strong>${o.slug}</strong></span>
-                    <span>Created: <strong>${dateStr}</strong></span> </div>
+                    <span>Created: <strong>${dateStr}</strong></span> 
+                </div>
                 
                 <div class="card-actions">
                     <button class="btn-sm btn-edit" onclick="event.stopPropagation(); editOrg('${o.id}')">Edit</button>
@@ -1612,7 +1622,6 @@
         `;
             }).join('');
         }
-
 
         function openModal(type) {
             if (type === 'org') {
