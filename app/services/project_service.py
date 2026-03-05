@@ -52,22 +52,18 @@ class ProjectService:
         await db.refresh(project)
         return project
 
+    # app/services/project_service.py
+
     @staticmethod
-    async def delete_project(
-        db: AsyncSession,
-        project_id: uuid.UUID,
-        user: User,
-    ):
-        result = await db.execute(
-            select(Project).where(Project.id == project_id)
-        )
+    async def delete_project(db: AsyncSession, project_id: str, user: User):
+        result = await db.execute(select(Project).where(Project.id == project_id))
         project = result.scalar_one_or_none()
 
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
         await db.delete(project)
-        await db.commit()
+        await db.commit() # Don't forget to commit the deletion!
 
 
     @staticmethod

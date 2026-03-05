@@ -1789,8 +1789,7 @@
 
             grid.innerHTML = projects.map(p => {
                 const dateObj = p.created_at ? new Date(p.created_at) : null;
-                const isValidDate = dateObj && !isNaN(dateObj.getTime());
-                const dateStr = isValidDate ? dateObj.toLocaleDateString() : "Pending...";
+                const dateStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleDateString() : "Pending...";
 
                 return `
             <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer">
@@ -1800,17 +1799,23 @@
                 </div>
                 <div class="card-meta">
                     <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">
-                        ${p.description || "No description provided."}
+                        ${p.description || "No description."}
                     </p>
                     <span>Created: <strong>${dateStr}</strong></span>
                 </div>
                 <div class="card-actions">
                     <button class="btn-sm btn-edit" onclick="event.stopPropagation(); openEditProject('${p.id}')">Edit</button>
+                    <button class="btn-sm btn-danger" 
+                            style="background: #dc3545; color: white; border: none; margin-left: 5px;" 
+                            onclick="event.stopPropagation(); deleteProject('${p.id}', '${p.name.replace(/'/g, "\\'")}')">
+                        Delete
+                    </button>
                 </div>
             </div>
         `;
             }).join('');
         }
+
         async function loadProjects(orgId) {
             try {
                 // Fetch projects specifically for the open organization
@@ -1901,16 +1906,24 @@
             }
         }
 
-        async function deleteProject(id) {
-            if (!confirm('Delete this project?')) return;
+        async function deleteProject(id, name) {
+            if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+                return;
+            }
+
             try {
+                // Calling your FastAPI DELETE route: /projects/{project_id}
                 await api('DELETE', `/projects/${id}`);
-                state.projects = state.projects.filter(p => p.id !== id);
-                renderProjects();
-                updateStats();
-                showToast('Project deleted.');
+
+                showToast("Project deleted successfully");
+
+                // Refresh the list using the current organization ID in state
+                if (state.currentOrgId) {
+                    loadProjects(state.currentOrgId);
+                }
             } catch (e) {
-                showToast(e.message, 'error');
+                console.error("Delete error:", e);
+                alert("Failed to delete project: " + e.message);
             }
         }
 

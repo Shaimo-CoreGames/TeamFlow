@@ -53,11 +53,11 @@ async def update_project(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_project(
-    project_id: uuid.UUID,
+    project_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await ProjectService.delete_project(
+    return await ProjectService.delete_project(
         db=db,
         project_id=project_id,
         user=current_user,
