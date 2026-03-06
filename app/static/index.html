@@ -925,7 +925,10 @@
     <div id="modal-task-overlay" class="modal-overlay">
         <div class="modal-content"
             style="background: #1f2937; color: white; padding: 20px; border-radius: 12px; width: 400px;">
-            <h3>New Task</h3>
+
+            <h3 id="task-modal-title">New Task</h3>
+
+            <input type="hidden" id="task-status-input" value="Pending">
 
             <label>Title</label>
             <input type="text" id="task-title" style="width: 100%; margin-bottom: 15px;">
@@ -945,9 +948,10 @@
                 style="width: 100%; margin-bottom: 20px; background: #374151; color: white; border: 1px solid #4b5563; padding: 5px; border-radius: 4px;">
 
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button onclick="closeTaskModal()">Cancel</button>
+                <button onclick="closeTaskModal()"
+                    style="background: transparent; color: #9ca3af; border: none; cursor: pointer;">Cancel</button>
                 <button onclick="saveTask()"
-                    style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px;">Save
+                    style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Save
                     Task</button>
             </div>
         </div>
@@ -1107,7 +1111,7 @@
 
                 <div class="kanban-board" style="display: flex; gap: 20px; margin-top: 30px; align-items: flex-start;">
 
-                    <div class="kanban-column"
+                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Pending')"
                         style="background-color: #080c15; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #131924;">
                         <div class="column-header"
                             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
@@ -1154,13 +1158,40 @@
 
             <div id="view-tasks" class="view">
                 <div class="page-header">
-                    <div>
-                        <div class="page-title">Tasks</div>
-                        <div class="page-sub">All tasks across your projects</div>
-                    </div>
-                    <button class="btn-add" onclick="openModal('task')">＋ New Task</button>
+                    <div class="page-title" id="project-detail-name">Project Tasks</div>
                 </div>
-                <div class="tasks-list" id="tasks-list"></div>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start;">
+                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Pending')"
+                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                            <h3 style="font-size: 14px; color: #9ca3af;">PENDING</h3>
+                            <button onclick="openTaskModal('Pending')"
+                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
+                        </div>
+                        <div id="tasks-pending" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'In-Progress')"
+                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                            <h3 style="font-size: 14px; color: #818cf8;">IN PROGRESS</h3>
+                            <button onclick="openTaskModal('In-Progress')"
+                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
+                        </div>
+                        <div id="tasks-progress" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+
+                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Completed')"
+                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                            <h3 style="font-size: 14px; color: #43e97b;">COMPLETED</h3>
+                            <button onclick="openTaskModal('Completed')"
+                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
+                        </div>
+                        <div id="tasks-completed" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- MEMBERS VIEW -->
@@ -1359,6 +1390,50 @@
             }
         }
 
+        function handleDragStart(event, taskId) {
+            // Store the ID of the task being dragged
+            event.dataTransfer.setData("taskId", taskId);
+        }
+
+        function allowDrop(event) {
+            // Necessary to allow a drop
+            event.preventDefault();
+        }
+
+        async function handleDrop(event, newStatus) {
+            event.preventDefault();
+            const taskId = event.dataTransfer.getData("taskId");
+
+            // 1. Find the task in local state
+            const task = state.tasks.find(t => t.id === taskId);
+            if (!task || task.status === newStatus) return;
+
+            // 2. Optimistic Update: Update UI immediately for "Pro" feel
+            const oldStatus = task.status;
+            task.status = newStatus;
+            renderTasks();
+
+            try {
+                // 3. API Call to update status in FastAPI backend
+                const response = await fetch(`/tasks/${taskId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (!response.ok) throw new Error("Failed to update status");
+
+                showToast(`Moved to ${newStatus}`, 'success');
+            } catch (error) {
+                // Rollback if server fails
+                task.status = oldStatus;
+                renderTasks();
+                showToast('Sync failed. Task moved back.', 'error');
+            }
+        }
         // Helper to show feedback (ensure this exists in your script)
         function showToast(message, type) {
             const toast = document.getElementById('toast');
@@ -2088,49 +2163,39 @@
         }
 
         async function saveTask() {
-            // 1. Get values using the exact IDs from your modal
-            const title = document.getElementById('task-title').value.trim();
-            const description = document.getElementById('task-desc').value.trim();
-            const priority = document.getElementById('task-priority').value;
-            const dueDateValue = document.getElementById('task-due-date').value;
+            const title = document.getElementById('task-title').value;
+            const projectId = state.currentProjectId; // Must be set when you enter a project view
 
-            // The status is passed when opening the modal or stored in a hidden input
-            const status = document.getElementById('task-status-input')?.value || "Pending";
+            if (!title) return showToast("Title is required", "error");
+            if (!projectId) return showToast("Project ID is missing", "error");
 
-            // 2. Validation
-            if (title.length < 2) {
-                showToast('Please enter a title (min 2 chars)', 'error');
-                return;
-            }
+            // Get the date string from the input
+            const dateValue = document.getElementById('task-due-date').value;
 
-            // 3. Prepare Data
-            const taskData = {
+            const payload = {
                 title: title,
-                description: description || null,
-                priority: priority,
-                status: status,
-                project_id: state.currentProjectId,
-                // Convert the date picker string to a proper ISO format for FastAPI
-                due_date: dueDateValue ? new Date(dueDateValue).toISOString() : null,
-                assigned_to: null
+                description: document.getElementById('task-desc').value,
+                priority: document.getElementById('task-priority').value,
+                status: document.getElementById('task-status-input').value || "Pending",
+                project_id: projectId, // Matches your TaskCreate schema
+                due_date: dateValue ? new Date(dateValue).toISOString() : null
             };
 
             try {
-                console.log("Sending data:", taskData);
+                // MATCHING THE ROUTE: /projects/{project_id}/tasks
+                const response = await api('POST', `/projects/${projectId}/tasks`, payload);
 
-                const response = await api('POST', `/projects/${state.currentProjectId}/tasks`, taskData);
-
-                showToast('Task saved successfully!', 'success');
-
-                // 4. Close modal and refresh board
+                showToast("Task created successfully", "success");
                 closeTaskModal();
-                openProjectDetail(state.currentProjectId);
 
+                // Refresh your task list
+                if (typeof loadTasks === 'function') loadTasks(projectId);
             } catch (err) {
-                console.error("Save Task Error:", err);
-                showToast(err.message || 'Failed to save task', 'error');
+                console.error("Task Creation Failed:", err);
+                showToast("Failed to create task. Check console.", "error");
             }
         }
+
         async function loadTasks() {
             // Tasks are per-project; we load them from what we create/cache
             state.tasks = JSON.parse(sessionStorage.getItem('tf_tasks') || '[]');
@@ -2147,30 +2212,27 @@
                 'Completed': document.getElementById('tasks-completed')
             };
 
-            // Clear columns first
             Object.values(columns).forEach(col => { if (col) col.innerHTML = ''; });
 
-            const tasks = state.tasks || [];
-
-            tasks.forEach(task => {
+            (state.tasks || []).forEach(task => {
                 const taskHtml = `
-            <div class="task-card" style="background: #131924; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)};">
+            <div class="task-card" 
+                 draggable="true" 
+                 ondragstart="handleDragStart(event, '${task.id}')"
+                 style="background: #131924; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)}; cursor: grab;">
                 <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${task.title}</div>
                 <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">${task.description || ''}</div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 10px; background: #1f2937; padding: 2px 6px; border-radius: 4px;">${task.priority}</span>
-                    <button class="btn-sm" onclick="openEditTask('${task.id}')" style="background:none; border:none; color:#818cf8; cursor:pointer;">
-                        <i class="fas fa-edit"></i>
+                    <button class="btn-sm" onclick="deleteTask('${task.id}', '${task.title}')" style="background:none; border:none; color:#ef4444; cursor:pointer;">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
         `;
 
-                // Map status to column
                 const column = columns[task.status];
-                if (column) {
-                    column.insertAdjacentHTML('beforeend', taskHtml);
-                }
+                if (column) column.insertAdjacentHTML('beforeend', taskHtml);
             });
         }
 
@@ -2279,95 +2341,54 @@
  * Opens the task creation modal and pre-fills the status based on the column clicked.
  * @param {string} status - The status of the column ('Pending', 'In Progress', 'Completed')
  */
+        // 1. Consolidated Modal Opener
         function openTaskModal(status = 'Pending') {
-            // 1. Ensure the modal overlay exists before trying to show it
             const modalOverlay = document.getElementById('modal-task-overlay');
+
             if (!modalOverlay) {
                 console.error("Modal overlay not found in DOM.");
                 return;
             }
 
-            // 2. Set the status in the hidden input or dropdown
+            // Set the status - this is crucial for your "Sync" to know which column to use
             const statusInput = document.getElementById('task-status-input');
-            if (statusInput) statusInput.value = status;
+            if (statusInput) {
+                statusInput.value = status;
+            }
 
-            // 3. Update Title to show context
+            // Update the UI text
             const modalTitle = document.getElementById('task-modal-title');
-            if (modalTitle) modalTitle.textContent = `Create New Task (${status})`;
+            if (modalTitle) {
+                modalTitle.textContent = `Create New Task (${status})`;
+            }
 
-            // 4. Clear all important fields for a fresh start
-            if (document.getElementById('task-title')) document.getElementById('task-title').value = "";
-            if (document.getElementById('task-desc')) document.getElementById('task-desc').value = "";
-            if (document.getElementById('task-priority')) document.getElementById('task-priority').value = "Medium";
+            // Reset fields for a fresh entry
+            const fields = ['task-title', 'task-desc', 'task-due-date'];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = "";
+            });
 
-            // 5. Activate the modal using your existing CSS class
+            const priorityEl = document.getElementById('task-priority');
+            if (priorityEl) priorityEl.value = "Medium";
+
+            // Show the modal
             modalOverlay.classList.add('active');
         }
 
-        // 2. Function to close the modal
+        // 2. Simple Closer
         function closeTaskModal() {
             document.getElementById('modal-task-overlay').classList.remove('active');
         }
 
-
-        function openTaskModal(status = 'Pending') {
-            // 1. Ensure the modal overlay exists before trying to show it
-            const modalOverlay = document.getElementById('modal-task-overlay');
-            if (!modalOverlay) {
-                console.error("Modal overlay not found in DOM.");
-                return;
-            }
-
-            // 2. Set the status in the hidden input or dropdown
-            const statusInput = document.getElementById('task-status-input');
-            if (statusInput) statusInput.value = status;
-
-            // 3. Update Title to show context
-            const modalTitle = document.getElementById('task-modal-title');
-            if (modalTitle) modalTitle.textContent = `Create New Task (${status})`;
-
-            // 4. Clear all important fields for a fresh start
-            if (document.getElementById('task-title')) document.getElementById('task-title').value = "";
-            if (document.getElementById('task-desc')) document.getElementById('task-desc').value = "";
-            if (document.getElementById('task-priority')) document.getElementById('task-priority').value = "Medium";
-
-            // 5. Activate the modal using your existing CSS class
-            modalOverlay.classList.add('active');
-        }
-        function openTaskModal(status = 'Pending') {
-            // 1. Ensure the modal overlay exists before trying to show it
-            const modalOverlay = document.getElementById('modal-task-overlay');
-            if (!modalOverlay) {
-                console.error("Modal overlay not found in DOM.");
-                return;
-            }
-
-            // 2. Set the status in the hidden input or dropdown
-            const statusInput = document.getElementById('task-status-input');
-            if (statusInput) statusInput.value = status;
-
-            // 3. Update Title to show context
-            const modalTitle = document.getElementById('task-modal-title');
-            if (modalTitle) modalTitle.textContent = `Create New Task (${status})`;
-
-            // 4. Clear all important fields for a fresh start
-            if (document.getElementById('task-title')) document.getElementById('task-title').value = "";
-            if (document.getElementById('task-desc')) document.getElementById('task-desc').value = "";
-            if (document.getElementById('task-priority')) document.getElementById('task-priority').value = "Medium";
-
-            // 5. Activate the modal using your existing CSS class
-            modalOverlay.classList.add('active');
-        }
-
+        // 3. Delete Task
         async function deleteTask(taskId) {
             if (!confirm("Are you sure you want to delete this task?")) return;
 
             try {
-                // Calls your backend DELETE /tasks/{id}
                 await api('DELETE', `/tasks/${taskId}`);
                 showToast("Task deleted", "success");
 
-                // Refresh the board to show it's gone
                 if (state.currentProjectId) {
                     openProjectDetail(state.currentProjectId);
                 }
@@ -2376,7 +2397,6 @@
                 showToast("Failed to delete task", "error");
             }
         }
-
         // ===================================================
         // COMMENTS
         // ===================================================
