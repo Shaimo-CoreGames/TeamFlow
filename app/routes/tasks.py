@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from typing import List
 from app.database import get_db
 from app.schemas.task_schema import (
     TaskCreate,
@@ -12,21 +12,22 @@ from app.dependencies.auth_dependency import get_current_user
 from app.models.user import User
 
 router = APIRouter(
-    prefix="/tasks",
     tags=["Tasks"],
 )
 
-
 @router.post(
-    "/",
+    "/projects/{project_id}/tasks",
     response_model=TaskResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_task(
+    project_id: str, # Get this from the URL
     task_data: TaskCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Force the task to belong to the project in the URL
+    task_data.project_id = project_id 
     return await TaskService.create_task(
         db=db,
         task_data=task_data,
@@ -35,11 +36,11 @@ async def create_task(
 
 
 @router.put(
-    "/{task_id}",
+    "/tasks/{task_id}",
     response_model=TaskResponse,
 )
 async def update_task(
-    task_id: int,
+    task_id: str,
     task_data: TaskUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -53,11 +54,11 @@ async def update_task(
 
 
 @router.delete(
-    "/{task_id}",
+    "/tasks/{task_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_task(
-    task_id: int,
+    task_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -66,3 +67,10 @@ async def delete_task(
         task_id=task_id,
         user=current_user,
     )
+
+@router.get("/tasks/project/{project_id}", response_model=List[TaskResponse])
+async def get_project_tasks(
+    project_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    return await TaskService.get_tasks_by_project(db, project_id)

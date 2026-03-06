@@ -16,7 +16,6 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     pass
 
-
 # ==============================
 # Update
 # ==============================

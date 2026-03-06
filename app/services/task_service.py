@@ -35,7 +35,7 @@ class TaskService:
     @staticmethod
     async def update_task(
         db: AsyncSession,
-        task_id: int,
+        task_id: str,
         task_data: TaskUpdate,
         user: User,
     ) -> Task:
@@ -59,7 +59,7 @@ class TaskService:
     @staticmethod
     async def delete_task(
         db: AsyncSession,
-        task_id: int,
+        task_id: str,
         user: User,
     ):
         result = await db.execute(
@@ -72,3 +72,13 @@ class TaskService:
 
         await db.delete(task)
         await db.commit()
+        # app/services/task_service.py
+
+
+    @staticmethod
+    async def get_tasks_by_project(db: AsyncSession, project_id: str):
+        # Ensure project_id is handled as a string for SQLite compatibility
+        result = await db.execute(
+            select(Task).where(Task.project_id == str(project_id))
+        )
+        return result.scalars().all()

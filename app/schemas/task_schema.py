@@ -20,8 +20,8 @@ class TaskBase(BaseModel):
 # ==============================
 
 class TaskCreate(TaskBase):
-    project_id: int
-    assigned_to: Optional[int] = None
+    project_id: str
+    assigned_to: Optional[str] = None
 
 
 # ==============================
@@ -33,7 +33,7 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     priority: Optional[str] = Field(None, max_length=50)
     status: Optional[str] = Field(None, max_length=50)
-    assigned_to: Optional[int] = None
+    assigned_to: Optional[str] = None
     due_date: Optional[datetime] = None
 
 
@@ -42,9 +42,9 @@ class TaskUpdate(BaseModel):
 # ==============================
 
 class TaskResponse(TaskBase):
-    id: int
-    project_id: int
-    assigned_to: Optional[int]
+    id: str
+    project_id: str
+    assigned_to: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
