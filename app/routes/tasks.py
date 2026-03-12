@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database import get_db
@@ -74,3 +76,22 @@ async def get_project_tasks(
     db: AsyncSession = Depends(get_db)
 ):
     return await TaskService.get_tasks_by_project(db, project_id)
+
+
+@router.patch("/tasks/{task_id}/status", response_model=TaskResponse)
+async def update_task_status(
+    task_id: str, 
+    payload: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    new_status = payload.get("status")
+    if not new_status:
+        raise HTTPException(status_code=400, detail="Status field is required")
+
+    # Call the service layer to update the DB
+    task = await TaskService.update_task_status(db, task_id, new_status)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    return task

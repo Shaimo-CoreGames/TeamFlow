@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
@@ -82,3 +84,15 @@ class TaskService:
             select(Task).where(Task.project_id == str(project_id))
         )
         return result.scalars().all()
+    
+    @staticmethod
+    async def update_task_status(db: AsyncSession, task_id: str, status: str):
+        # Use str(task_id) if there is any chance it's being passed as a UUID object
+        result = await db.execute(select(Task).where(Task.id == str(task_id)))
+        task = result.scalar_one_or_none()
+        
+        if task:
+            task.status = status
+            await db.commit()
+            await db.refresh(task)
+        return task

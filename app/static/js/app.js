@@ -47,50 +47,6 @@
             }
         }
 
-        function handleDragStart(event, taskId) {
-            // Store the ID of the task being dragged
-            event.dataTransfer.setData("taskId", taskId);
-        }
-
-        function allowDrop(event) {
-            // Necessary to allow a drop
-            event.preventDefault();
-        }
-
-        async function handleDrop(event, newStatus) {
-            event.preventDefault();
-            const taskId = event.dataTransfer.getData("taskId");
-
-            // 1. Find the task in local state
-            const task = state.tasks.find(t => t.id === taskId);
-            if (!task || task.status === newStatus) return;
-
-            // 2. Optimistic Update: Update UI immediately for "Pro" feel
-            const oldStatus = task.status;
-            task.status = newStatus;
-            renderTasks();
-
-            try {
-                // 3. API Call to update status in FastAPI backend
-                const response = await fetch(`/tasks/${taskId}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                });
-
-                if (!response.ok) throw new Error("Failed to update status");
-
-                showToast(`Moved to ${newStatus}`, 'success');
-            } catch (error) {
-                // Rollback if server fails
-                task.status = oldStatus;
-                renderTasks();
-                showToast('Sync failed. Task moved back.', 'error');
-            }
-        }
         // Helper to show feedback (ensure this exists in your script)
         function showToast(message, type) {
             const toast = document.getElementById('toast');
@@ -98,6 +54,34 @@
             toast.textContent = message;
             toast.className = `show ${type}`;
             setTimeout(() => { toast.className = ''; }, 3000);
+        }
+
+        async function updateTaskStatus(taskId, newStatus) {
+            try {
+                // 1. UPDATE LOCAL STATE IMMEDIATELY (Optimistic UI)
+                // This stops the "Failed" feeling because the data is already updated locally
+                const task = state.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.status = newStatus;
+                    renderTasks(); // Redraw the UI immediately
+                }
+
+                // 2. CALL API
+                await api('PATCH', `tasks/${taskId}/status`, { status: newStatus });
+                
+                // 3. SHOW SUCCESS
+                showToast(`Moved to ${newStatus}`, "success");
+
+                // 4. SYNC (Optional)
+                // We don't 'await' this or we do it quietly so it doesn't trigger the catch block
+                openProjectDetail(state.currentProjectId).catch(err => console.error("Sync error:", err));
+
+            } catch (e) {
+                console.error("Drag Drop Error:", e);
+                showToast("Server sync failed. Refreshing...", "error");
+                // If it actually failed, reload to put the task back
+                openProjectDetail(state.currentProjectId);
+            }
         }
 
         // ===================================================
@@ -885,44 +869,77 @@
         }
 
         function renderTasks() {
-            const columns = {
-                'Pending': document.getElementById('tasks-pending'),
-                'In-Progress': document.getElementById('tasks-progress'),
-                'Completed': document.getElementById('tasks-completed')
-            };
+        // 1. Map the status strings to your HTML IDs
+        // Since your modal saves status as 'Pending', 'In-Progress', etc., we use those keys.
+        const columns = {
+            'Pending': document.getElementById('tasks-Pending'),
+            'In-Progress': document.getElementById('tasks-In-Progress'),
+            'Completed': document.getElementById('tasks-Completed')
+        };
 
-            Object.values(columns).forEach(col => { if (col) col.innerHTML = ''; });
+        // 2. Clear columns
+        Object.values(columns).forEach(col => { if (col) col.innerHTML = ''; });
 
-            (state.tasks || []).forEach(task => {
-                const taskHtml = `
-            <div class="task-card" 
-                 draggable="true" 
-                 ondragstart="handleDragStart(event, '${task.id}')"
-                 style="background: #131924; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)}; cursor: grab;">
-                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${task.title}</div>
-                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">${task.description || ''}</div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 10px; background: #1f2937; padding: 2px 6px; border-radius: 4px;">${task.priority}</span>
-                    <button class="btn-sm" onclick="deleteTask('${task.id}', '${task.title}')" style="background:none; border:none; color:#ef4444; cursor:pointer;">
-                        <i class="fas fa-trash"></i>
-                    </button>
+        // 3. Loop and Append
+        (state.tasks || []).forEach(task => {
+            const taskHtml = `
+                <div class="task-card" 
+                    draggable="true" 
+                    ondragstart="handleDragStart(event, '${task.id}')"
+                    style="background: #131924; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)}; cursor: grab; margin-bottom:10px;">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color:white;">${task.title}</div>
+                    <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">${task.description || ''}</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 10px; background: #1f2937; padding: 2px 6px; border-radius: 4px; color:#818cf8;">${task.priority}</span>
+                        <button onclick="confirmDeleteTask('${task.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
 
-                const column = columns[task.status];
-                if (column) column.insertAdjacentHTML('beforeend', taskHtml);
-            });
-        }
-
-        function getStatusColor(status) {
-            switch (status) {
-                case 'Pending': return '#9ca3af';
-                case 'In-Progress': return '#fbbf24';
-                case 'Completed': return '#10b981';
-                default: return '#4f46e5';
+            const column = columns[task.status];
+            if (column) {
+                column.insertAdjacentHTML('beforeend', taskHtml);
+            } else {
+                // This will tell you in the F12 console if the name is wrong!
+                console.error(`Missing column for status: "${task.status}"`);
             }
+        });
+    }
+
+        // Ensure this helper exists so colors work
+        function getStatusColor(status) {
+            if (status === 'Pending') return '#6366f1';
+            if (status === 'In-Progress') return '#f59e0b';
+            if (status === 'Completed') return '#10b981';
+            return '#4b5563';
         }
+
+                // 1. When you start dragging a task card
+        function handleDragStart(event, taskId) {
+            event.dataTransfer.setData("text/plain", taskId);
+            event.target.style.opacity = "0.5";
+        }
+
+        // 2. Needed to allow the browser to drop items into columns
+        function allowDrop(event) {
+            event.preventDefault(); // This is mandatory for drop to work
+        }
+
+        // 3. When the task is dropped into a new column
+        async function handleDrop(event, newStatus) {
+            event.preventDefault();
+            const taskId = event.dataTransfer.getData("text/plain");
+            
+            // Reset opacity
+            const draggedEl = document.querySelector(`[data-task-id="${taskId}"]`); 
+            if (draggedEl) draggedEl.style.opacity = "1";
+
+            // CALL THE OPTIMISTIC FUNCTION INSTEAD OF WRITING RAW LOGIC HERE
+            await updateTaskStatus(taskId, newStatus);
+        }
+        
         function createTaskCard(task) {
             const priorityColor = task.priority === 'High' ? '#ff6584' : (task.priority === 'Low' ? '#43e97b' : '#ffc850');
             const displayDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : "No date";
