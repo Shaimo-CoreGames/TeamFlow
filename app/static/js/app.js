@@ -330,10 +330,13 @@
 
             // Load ONLY the organizations first
             await loadOrgs();
-
-            // Redirect user to the dashboard view by default
-            showView('dashboard');
-            renderDashboard();
+            const savedProjectId = localStorage.getItem('tf_last_project');
+            if (savedProjectId) {
+                await openProjectDetail(savedProjectId);
+            } else {
+                showView('dashboard');
+                renderDashboard();
+            }
         }
 
         // ===================================================
@@ -791,32 +794,50 @@
         // TASKS
         // ===================================================
         async function openProjectDetail(projectId) {
+    // 1. Find the project in our local state list
             const project = state.projects.find(p => p.id === projectId);
-            if (!project) return;
+            
+            // If the project isn't in state (e.g., after a refresh), 
+            // we might need to fetch all projects first.
+            if (!project) {
+                await loadProjects(state.currentOrgId);
+                const refetchedProject = state.projects.find(p => p.id === projectId);
+                if (!refetchedProject) return;
+            }
 
-            // 1. Update State
+            // 2. Update Global State & Browser Memory (Persistence)
             state.currentProjectId = projectId;
-
-            // 2. Clear old tasks immediately so the board looks fresh
-            state.tasks = [];
-            renderTasks();
+            localStorage.setItem('tf_last_project', projectId); 
 
             // 3. Update UI Header
-            document.getElementById('view-project-detail-title').textContent = project.name;
-            document.getElementById('view-project-detail-desc').textContent = project.description || "";
+            const titleEl = document.getElementById('view-project-detail-title');
+            const descEl = document.getElementById('view-project-detail-desc');
+            
+            if (titleEl) titleEl.textContent = project.name;
+            if (descEl) descEl.textContent = project.description || "No description provided.";
 
-            // 4. Switch View
+            // 4. Switch View to the Project Detail board
             showView('project-detail');
 
-            // 5. Fetch and Render
+            // 5. Loading State: Clear old tasks and show a loader
+            state.tasks = [];
+            const tasksGrid = document.getElementById('tasks-grid'); // Adjust ID if yours is different
+            if (tasksGrid) {
+                tasksGrid.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+            }
+
+            // 6. Fetch from FastAPI and Render
             try {
-                // Ensure this URL matches your FastAPI @router.get path exactly!
+                // This calls: @router.get("/tasks/project/{project_id}")
                 const tasks = await api('GET', `/tasks/project/${projectId}`);
+                
                 state.tasks = tasks || [];
-                renderTasks();
+                renderTasks(); // This function draws the Kanban columns/cards
+                
             } catch (e) {
                 console.error("Failed to load tasks:", e);
-                showToast("Error loading tasks", "error");
+                if (tasksGrid) tasksGrid.innerHTML = ''; // Clear loader
+                showToast("Error loading tasks. Please try again.", "error");
             }
         }
 
