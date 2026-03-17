@@ -9,9 +9,6 @@ from app.models.user import User
 
 
 class ProjectService:
-
-    # app/services/project_service.py
-
     @staticmethod
     async def create_project(
         db: AsyncSession,
@@ -33,7 +30,6 @@ class ProjectService:
 
         return project # <--- CRITICAL: If this is missing, the route crashes
    
-   
     @staticmethod
     async def update_project(db: AsyncSession, project_id: uuid.UUID, project_data: ProjectUpdate, user: User) -> Project:
         result = await db.execute(select(Project).where(Project.id == str(project_id))) 
@@ -45,14 +41,12 @@ class ProjectService:
         # Update fields if provided
         if project_data.name is not None:
             project.name = project_data.name
-        if project_data.description is not None: # ADDED
+        if project_data.description is not None: 
             project.description = project_data.description
 
         await db.commit()
         await db.refresh(project)
         return project
-
-    # app/services/project_service.py
 
     @staticmethod
     async def delete_project(db: AsyncSession, project_id: str, user: User):
@@ -64,7 +58,6 @@ class ProjectService:
 
         await db.delete(project)
         await db.commit() # Don't forget to commit the deletion!
-
 
     @staticmethod
     async def get_organization_projects(

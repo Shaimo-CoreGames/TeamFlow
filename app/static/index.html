@@ -147,6 +147,14 @@
                         <div class="stat-value" id="stat-done">—</div>
                     </div>
                 </div>
+                <div id="invites-section" style="display: none; margin-bottom: 24px;">
+                    <div class="page-title" style="font-size:18px; margin-bottom:12px; color: #818cf8;">
+                        Pending Project Invitations
+                    </div>
+                    <div id="invites-list"
+                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                    </div>
+                </div>
                 <div class="page-title" style="font-size:20px;margin-bottom:16px;">Recent Tasks</div>
                 <div id="dash-tasks"></div>
             </div>
@@ -195,7 +203,17 @@
                             <p id="view-project-detail-desc" class="text-dim"
                                 style="color: #9ca3af; margin-top: 5px; font-size: 0.95rem;"></p>
                         </div>
-
+                        <div class="invite-section"
+                            style="margin-top: 2rem; padding: 1rem; background: #1f2937; border-radius: 12px;">
+                            <h4 style="color: white; margin-bottom: 1rem;">Invite Collaborator</h4>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="user-search-input" placeholder="Search by username or email..."
+                                    style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: white;">
+                                <button onclick="searchUsers()" class="btn-primary">Search</button>
+                            </div>
+                            <div id="search-results"
+                                style="margin-top: 1rem; display: flex; flex-direction: column; gap: 8px;"></div>
+                        </div>
                         <button type="button" onclick="openTaskModal('Pending')"
                             style="background-color: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.2s;">
                             <i class="fas fa-plus"></i> Add Task

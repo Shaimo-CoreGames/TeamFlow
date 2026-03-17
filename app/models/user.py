@@ -20,6 +20,7 @@ class User(Base):
 
     # Relationships
     comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
+    project_memberships = relationship("ProjectMember", back_populates="user")
     memberships = relationship(
         "Membership", 
         back_populates="user", 

@@ -1,12 +1,12 @@
 from typing import List, Optional
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import select,or_, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.user import User
 from app.schemas.user_schema import UserUpdate
 from app.core.security import hash_password
-
+from app.models.project import Project
+from app.models.membership import ProjectMember
 
 class UserService:
 
@@ -101,3 +101,31 @@ class UserService:
         await db.commit()
 
         return True
+    
+    @staticmethod
+    async def search_users(db: AsyncSession, query: str):
+        # This looks for partial matches in both name and email
+        stmt = select(User).where(
+            or_(
+                User.name.ilike(f"%{query}%"),
+                User.email.ilike(f"%{query}%")
+            )
+        ).limit(10) # Limit results for performance
+        
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_user_invitations(db: AsyncSession, user_id: str):
+        # We select the project name so the user knows what they are joining
+        stmt = (
+            select(Project.id, Project.name)
+            .join(ProjectMember, Project.id == ProjectMember.project_id)
+            .where(
+                ProjectMember.user_id == user_id,
+                ProjectMember.status == "pending"
+            )
+        )
+        result = await db.execute(stmt)
+        # Convert rows to a list of dictionaries for the frontend
+        return [{"project_id": row.id, "project_name": row.name} for row in result]

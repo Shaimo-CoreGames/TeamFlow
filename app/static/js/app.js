@@ -56,6 +56,8 @@
             setTimeout(() => { toast.className = ''; }, 3000);
         }
 
+        
+
         async function updateTaskStatus(taskId, newStatus) {
             try {
                 // 1. UPDATE LOCAL STATE IMMEDIATELY (Optimistic UI)
@@ -300,28 +302,38 @@
         // ===================================================
         
         async function loadApp() {
-            try {
-                state.user = await api('GET', '/auth/me');
-            } catch {
-                doLogout(); return;
-            }
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('app').style.display = 'flex';
+    try {
+        state.user = await api('GET', '/auth/me');
+    } catch {
+        doLogout(); 
+        return;
+    }
 
-            // Set nav user info
-            document.getElementById('nav-avatar').textContent = initials(state.user.name);
-            document.getElementById('nav-name').textContent = state.user.name;
+    // 1. Show the App UI first so elements are available for rendering
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
 
-            // Load ONLY the organizations first
-            await loadOrgs();
-            const savedProjectId = localStorage.getItem('tf_last_project');
-            if (savedProjectId) {
-                await openProjectDetail(savedProjectId);
-            } else {
-                showView('dashboard');
-                renderDashboard();
-            }
-        }
+    // 2. Set nav user info
+    document.getElementById('nav-avatar').textContent = initials(state.user.name);
+    document.getElementById('nav-name').textContent = state.user.name;
+
+    // 3. REFRESH EVERYTHING: Organizations AND Invitations
+    await loadOrgs(); 
+    await loadInvitations(); // Ensure the "Invitations" section on the dashboard is updated
+
+    const savedProjectId = localStorage.getItem('tf_last_project');
+    
+    if (savedProjectId) {
+        // If we have a saved project, try to open it
+        await openProjectDetail(savedProjectId);
+    } else {
+        // Default to dashboard
+        showView('dashboard');
+        // IMPORTANT: renderDashboard relies on state.tasks/state.projects 
+        // which are usually loaded inside loadOrgs/loadProjects
+        renderDashboard();
+    }
+}
 
         // ===================================================
         // VIEWS
@@ -825,6 +837,80 @@
             }
         }
 
+        async function searchUsers() {
+            const query = document.getElementById('user-search-input').value;
+            const resultsContainer = document.getElementById('search-results');
+            
+            if (query.length < 2) return;
+
+            try {
+                // Matches your @router.get("/search")
+                const users = await api('GET', `/users/search?q=${query}`);
+                resultsContainer.innerHTML = '';
+
+                users.forEach(user => {
+                    const div = document.createElement('div');
+                    div.style = "display: flex; justify-content: space-between; align-items: center; background: #374151; padding: 10px; border-radius: 8px;";
+                    div.innerHTML = `
+                        <span style="color: white;">${user.name} (${user.email})</span>
+                        <button onclick="sendInvite(${user.id})" 
+                                style="background: #4f46e5; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer;">
+                            Invite
+                        </button>
+                    `;
+                    resultsContainer.appendChild(div);
+                });
+            } catch (err) {
+                console.error("Search failed", err);
+            }
+        }
+
+        function initials(name) {
+            if (!name) return '?';
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        async function sendInvite(targetUserId) {
+            if (!state.currentProjectId) {
+                showToast("Please select a project first", "error");
+                return;
+            }
+
+            try {
+                // You'll need an endpoint like POST /projects/{id}/invite
+                // Sending the targetUserId in the body
+                await api('POST', `/projects/${state.currentProjectId}/invite`, { user_id: targetUserId });
+                showToast("Invitation sent!", "success");
+                document.getElementById('search-results').innerHTML = ''; // Clear results
+            } catch (err) {
+                showToast("Already invited or error occurred", "error");
+            }
+        }
+
+        async function handleInvite(action) {
+            const overlay = document.getElementById('modal-invite-overlay');
+            const inviteId = overlay.dataset.inviteId;
+
+            try {
+                // 1. Tell the backend the user accepted
+                await api('POST', `/users/invitations/${inviteId}/respond?action=${action}`);
+                
+                if (action === 'accepted') {
+                    showToast("Joined project successfully!", "success");
+                    // 2. CRITICAL: Refresh the organizations list so the new org shows up
+                    await loadOrgs(); 
+                    renderOrgs();
+                } else {
+                    showToast("Invitation declined", "info");
+                }
+            } catch (err) {
+                console.error("Failed to respond:", err);
+            } finally {
+                // 3. Always hide the modal to prevent freezing
+                overlay.style.display = 'none';
+            }
+        }
+
         async function saveTask() {
             const title = document.getElementById('task-title').value;
             const projectId = state.currentProjectId; // Must be set when you enter a project view
@@ -1183,26 +1269,42 @@
         // ===================================================
         // DASHBOARD
         // ===================================================
-        function renderDashboard() {
+        async function renderDashboard() {
+            // 1. Update stats and load invitations first
             updateStats();
-            // Recent tasks
+            await loadInvitations(); // This ensures invites show up regardless of task count
+
+            // 2. Recent tasks logic
             const el = document.getElementById('dash-tasks');
-            const recent = [...state.tasks].slice(-5).reverse();
+            
+            // Safety check for state.tasks
+            const tasks = state.tasks || [];
+            const recent = [...tasks].slice(-5).reverse();
+
             if (!recent.length) {
-                el.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">No Tasks Yet</div><div class="empty-sub">Go to Tasks to create your first task</div></div>`;
+                el.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">✅</div>
+                        <div class="empty-title">No Tasks Yet</div>
+                        <div class="empty-sub">Go to Tasks to create your first task</div>
+                    </div>`;
                 return;
             }
-            el.innerHTML = `<div class="tasks-list">${recent.map(t => `
-    <div class="task-item">
-      <div class="task-info">
-        <div class="task-title-row">
-          <span class="task-name">${escHtml(t.title)}</span>
-          ${badge(t.status)} ${badge(t.priority)}
-        </div>
-        ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
-      </div>
-    </div>
-  `).join('')}</div>`;
+
+            el.innerHTML = `
+                <div class="tasks-list">
+                    ${recent.map(t => `
+                        <div class="task-item">
+                            <div class="task-info">
+                                <div class="task-title-row">
+                                    <span class="task-name">${escHtml(t.title)}</span>
+                                    ${badge(t.status)} ${badge(t.priority)}
+                                </div>
+                                ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`;
         }
 
         function updateStats() {
@@ -1240,6 +1342,74 @@
             });
         });
 
+        // 1. Define the functions at the very top level (not inside anything else)
+        async function loadInvitations() {
+            console.log("Fetching invitations...");
+            const container = document.getElementById('invites-list');
+            const section = document.getElementById('invites-section');
+            
+            if (!container || !section) return;
+
+            // Ensure section is always visible
+            section.style.display = 'block';
+
+            try {
+                const invites = await api('GET', 'users/me/invitations');
+                
+                if (!invites || invites.length === 0) {
+                    // Show empty state instead of hiding
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #9ca3af; border: 1px dashed #4b5563; border-radius: 8px;">
+                            <p style="margin: 0; font-size: 0.9rem;">No pending invitations</p>
+                        </div>`;
+                    return;
+                }
+
+                // Render invites if they exist
+                container.innerHTML = invites.map(invite => `
+                    <div class="invite-card" style="background: #1f2937; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 10px; border: 1px solid #4f46e5;">
+                        <div>
+                            <strong style="color: white;">${invite.project_name}</strong>
+                            <p style="color: #9ca3af; margin: 0; font-size: 0.8rem;">Project Invitation</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="respondInvite('${invite.project_id}', 'accepted')" style="background: #10b981; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Accept</button>
+                            <button onclick="respondInvite('${invite.project_id}', 'declined')" style="background: #ef4444; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Decline</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Error loading invites:", err);
+                container.innerHTML = `<p style="color: #ef4444; font-size: 0.8rem;">Failed to load invitations.</p>`;
+            }
+}
+
+        async function respondInvite(projectId, response) {
+            try {
+                // Send the response to the backend
+                await api('POST', `projects/${projectId}/respond-invite?response=${response}`);
+                
+                showToast(`Invitation ${response}!`, "success");
+
+                // 1. Refresh the invitations list (this makes it "vanish" from pending)
+                await loadInvitations(); 
+                
+                // 2. Refresh the projects list (this makes the new project appear in their sidebar)
+                if (response === 'accepted') {
+                    await loadProjects(); 
+                }
+                
+                // 3. Update the dashboard stats
+                await renderDashboard(); 
+            } catch (err) {
+                console.error("Error responding to invite:", err);
+                showToast("Failed to respond to invitation", "error");
+            }
+        }
+
+        window.loadInvitations = loadInvitations;
+        window.respondInvite = respondInvite;
+
         // ===================================================
         // INIT
         // ===================================================
@@ -1248,3 +1418,5 @@
                 await loadApp();
             }
         })();
+
+        
