@@ -1,10 +1,17 @@
+from sqlalchemy import select
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database import get_db
+from app.models.org_role import OrganizationRole
+from app.models.organization import Organization
 from app.schemas.organization_schema import OrgRead, OrganizationCreate
 from app.services.organization_service import OrganizationService
 from app.dependencies.auth_dependency import get_current_user
+from app.models.membership import Membership
+from sqlalchemy.orm import selectinload
+
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
@@ -38,6 +45,14 @@ async def update_org(
 ):
     return await OrganizationService.update_organization(db, org_id, org_in, current_user)
 
+@router.get("/{org_id}", response_model=OrgRead)
+async def get_organization(
+    org_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # This calls the helper we wrote in the Service
+    return await OrganizationService.get_org_by_id(db, org_id)
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_org(
     org_id: str,
@@ -46,3 +61,53 @@ async def delete_org(
 ):
     await OrganizationService.delete_organization(db, org_id, current_user)
     return None # HTTP 204 requires no body
+
+
+
+@router.put("/{org_id}/roles/{role_id}", response_model=OrgRead)
+async def update_org_role(
+    org_id: str,
+    role_id: str,
+    role_name: str, # You might want a small schema for this
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # Security Check
+    await OrganizationService._check_admin_access(db, org_id, str(current_user.id))
+    
+    result = await db.execute(
+        select(OrganizationRole).where(
+            OrganizationRole.id == role_id, 
+            OrganizationRole.organization_id == org_id
+        )
+    )
+    role = result.scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    role.role_name = role_name
+    await db.commit()
+    
+    # Return the whole Org so the frontend state stays in sync
+    return await OrganizationService.get_org_by_id(db, org_id)
+
+@router.delete("/{org_id}/roles/{role_id}")
+async def delete_org_role(
+    org_id: str,
+    role_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    await OrganizationService._check_admin_access(db, org_id, str(current_user.id))
+    
+    result = await db.execute(
+        select(OrganizationRole).where(
+            OrganizationRole.id == role_id, 
+            OrganizationRole.organization_id == org_id
+        )
+    )
+    role = result.scalar_one_or_none()
+    if role:
+        await db.delete(role)
+        await db.commit()
+    return {"message": "Role deleted"}

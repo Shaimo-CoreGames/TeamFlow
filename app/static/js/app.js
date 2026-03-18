@@ -339,17 +339,36 @@
         // VIEWS
         // ===================================================
         function showView(name) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`view-${name}`).classList.add('active');
-            event.target.classList.add('active');
-            if (name === 'dashboard') renderDashboard();
-            if (name === 'orgs') renderOrgs();
-            if (name === 'projects') renderProjects();
-            if (name === 'tasks') renderTasks();
-            if (name === 'members') renderMembers();
-            if (name === 'profile') renderProfile();
-        }
+    // 1. Hide all views
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    
+    // 2. Clear all nav buttons
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+    // 3. Show the target view
+    const target = document.getElementById(`view-${name}`);
+    if (target) {
+        target.classList.add('active');
+    } else {
+        console.error(`View "view-${name}" not found in HTML!`);
+    }
+
+    /* CRITICAL FIX: Check if 'event' exists and if the target is a nav-btn.
+       This prevents the "Nothing happens" crash when calling from JS logic.
+    */
+    if (typeof event !== 'undefined' && event && event.target && event.target.classList.contains('nav-btn')) {
+        event.target.classList.add('active');
+    }
+
+    // 4. Trigger Renders
+    if (name === 'dashboard') renderDashboard();
+    if (name === 'orgs') renderOrgs();
+    if (name === 'projects') renderProjects(); // This ensures projects are drawn
+    if (name === 'tasks') renderTasks();
+    if (name === 'members') renderMembers();
+    if (name === 'profile') renderProfile();
+    if (name === 'org-settings') renderOrgSettings();
+}
 
         // ===================================================
         // ORGS
@@ -414,41 +433,54 @@
         }
 
         function renderOrgs() {
-            const grid = document.getElementById('orgs-grid');
-            if (!grid) return;
+    const grid = document.getElementById('orgs-grid');
+    if (!grid) return;
 
-            if (!state.orgs || state.orgs.length === 0) {
-                grid.innerHTML = `<div class="empty-state">No organizations found.</div>`;
-                return;
-            }
+    if (!state.orgs || state.orgs.length === 0) {
+        grid.innerHTML = `<div class="empty-state">No organizations found.</div>`;
+        return;
+    }
 
-            grid.innerHTML = state.orgs.map(o => {
-                // 1. Format the Date
-                const dateStr = o.created_at
-                    ? new Date(o.created_at).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    })
-                    : 'Unknown';
+    grid.innerHTML = state.orgs.map(o => {
+        // 1. Format the Date
+        const dateStr = o.created_at
+            ? new Date(o.created_at).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            })
+            : 'Unknown';
 
-                // 2. Format Projects Badges
-                const projectsHtml = o.projects && o.projects.length > 0
-                    ? o.projects.map(p => `<span class="badge badge-progress">${p.name}</span>`).join('')
-                    : '<span class="text-dim">No projects</span>';
+        // 2. Format Projects Badges
+        const projectsHtml = o.projects && o.projects.length > 0
+            ? o.projects.map(p => `<span class="badge badge-progress">${p.name}</span>`).join('')
+            : '<span class="text-dim">No projects</span>';
 
-                // 3. Escape strings for the onclick event to prevent errors with quotes
-                const escapedName = o.name.replace(/'/g, "\\'");
-                const escapedDesc = (o.description || "").replace(/'/g, "\\'");
+        // 3. CRITICAL: Escape strings and REMOVE NEW LINES
+        // We must remove \n (line breaks) because they break JavaScript onclick attributes
+        const escapedName = o.name.replace(/'/g, "\\'");
+        const escapedDesc = (o.description || "")
+            .replace(/'/g, "\\'")             // Escape single quotes
+            .replace(/\r?\n|\r/g, " ")        // Replace "Enter" keys with a space
+            .replace(/"/g, "&quot;");         // Escape double quotes for safety
 
-                return `
+        return `
             <div class="card" 
                  onclick="enterOrganization('${o.id}', '${escapedName}', '${escapedDesc}')" 
-                 style="cursor:pointer">
+                 style="cursor:pointer; position: relative;">
                 
-                <div class="card-title">
-                    ${o.name}
-                    <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
+                <div class="card-title" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        ${o.name}
+                        <span style="font-size: 10px; color: var(--text-dim);">#${o.id.substring(0, 8)}</span>
+                    </div>
+                    
+                    <i class="fas fa-cog" 
+                       onclick="event.stopPropagation(); openOrgSettings('${o.id}')" 
+                       style="cursor: pointer; opacity: 0.5; font-size: 14px; padding: 5px;"
+                       onmouseover="this.style.opacity='1'" 
+                       onmouseout="this.style.opacity='0.5'"
+                       title="Organization Settings"></i>
                 </div>
                 
                 <p style="font-size: 12px; color: var(--text-dim); margin: 8px 0; line-height: 1.4;">
@@ -470,7 +502,77 @@
                 </div>
             </div>
         `;
-            }).join('');
+    }).join('');
+}
+
+        function renderOrgSettings() {
+            const rolesContainer = document.getElementById('role-list-container');
+            const org = state.currentOrg; // Current active organization
+
+            if (!org || !org.custom_roles) return;
+
+            rolesContainer.innerHTML = org.custom_roles.map(role => `
+                <div class="role-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #374151; border-radius: 8px; margin-bottom: 8px;">
+                    <input type="text" value="${role.role_name}" id="input-role-${role.id}" 
+                        style="background: transparent; border: 1px solid transparent; color: white; flex-grow: 1; padding: 5px; font-weight: 500;"
+                        onfocus="this.style.border='1px solid #4f46e5'; this.style.background='#111827';"
+                        onblur="this.style.border='1px solid transparent'; this.style.background='transparent';">
+                    
+                    <div style="display: flex; gap: 8px; margin-left: 10px;">
+                        <button onclick="updateRoleName('${role.id}')" title="Save Name" style="background: none; border: none; color: #10b981; cursor: pointer;">
+                            <i class="fas fa-check"></i> Save
+                        </button>
+                        <button onclick="deleteRole('${role.id}')" title="Delete Role" style="background: none; border: none; color: #ef4444; cursor: pointer;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function openOrgSettings(orgId) {
+            // 1. Fetch the latest data using your new get_org_by_id logic
+            state.currentOrg = await api('GET', `/organizations/${orgId}`);
+            
+            // 2. Switch the view
+            showView('org-settings');
+            
+            // 3. Fill the UI
+            document.getElementById('edit-org-name').value = state.currentOrg.name;
+            document.getElementById('edit-org-desc').value = state.currentOrg.description || '';
+            renderOrgSettings();
+        }
+
+        async function updateRoleName(roleId) {
+            const newName = document.getElementById(`input-role-${roleId}`).value.trim();
+            if (!newName) return showToast("Role name cannot be empty", "error");
+
+            try {
+                // We use the PUT route we designed
+                const updatedOrg = await api('PUT', `/organizations/${state.currentOrg.id}/roles/${roleId}?role_name=${newName}`);
+                
+                // Update local state with the full fresh Org object returned by get_org_by_id
+                state.currentOrg = updatedOrg; 
+                showToast("Role updated successfully!");
+                renderOrgSettings();
+            } catch (e) {
+                showToast("Failed to update role", "error");
+            }
+        }
+
+        async function deleteRole(roleId) {
+            if (!confirm("Are you sure? Users assigned to this role might be affected.")) return;
+
+            try {
+                await api('DELETE', `/organizations/${state.currentOrg.id}/roles/${roleId}`);
+                
+                // Remove from local state and re-render
+                state.currentOrg.custom_roles = state.currentOrg.custom_roles.filter(r => r.id !== roleId);
+                renderOrgSettings();
+                showToast("Role deleted");
+            } catch (e) {
+                showToast(e.message || "Could not delete role", "error");
+            }
         }
 
         function openModal(type) {
@@ -835,6 +937,71 @@
                 if (tasksGrid) tasksGrid.innerHTML = ''; // Clear loader
                 showToast("Error loading tasks. Please try again.", "error");
             }
+        }
+        async function searchAndAddToOrg() {
+            const query = document.getElementById('org-user-search').value;
+            const resultsContainer = document.getElementById('org-search-results');
+            
+            try {
+                const users = await api('GET', `/users/search?q=${query}`);
+                resultsContainer.innerHTML = users.map(user => `
+                    <div class="search-row" style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span>${user.full_name || user.name}</span>
+                        <button onclick="addMemberToOrg(${user.id})" class="btn-primary">Add to Org</button>
+                    </div>
+                `).join('');
+            } catch (e) { console.error("Search failed", e); }
+        }
+
+        async function addMemberToOrg(targetUserId) {
+            try {
+                // This hits your /memberships/ endpoint
+                await api('POST', '/memberships/', { 
+                    user_id: targetUserId, 
+                    organization_id: state.currentOrgId, 
+                    role: 'member' 
+                });
+                showToast("User added to Organization!");
+                loadOrgs(); // Refresh to show new circles
+            } catch (e) { showToast("Error adding member", "error"); }
+        }
+
+        async function renderProjectInviteList() {
+            const container = document.getElementById('project-invite-list');
+            
+            // 1. Get everyone in the current Org
+            const orgMembers = await api('GET', `/organizations/${state.currentOrgId}/members`);
+            
+            // 2. Filter out people who are ALREADY in this project
+            const candidates = orgMembers.filter(member => 
+                !state.currentProjectMembers.some(pm => pm.id === member.id)
+            );
+
+            container.innerHTML = candidates.map(user => `
+                <div class="member-row" style="display:flex; justify-content:space-between; padding:8px;">
+                    <span>${user.full_name}</span>
+                    <button onclick="sendInvite(${user.id})" class="btn-small">Add to Project</button>
+                </div>
+            `).join('');
+        }
+
+        function renderCircles(members) {
+            if (!members || members.length === 0) return '<span style="color:#6b7280">No members</span>';
+            
+            const limit = 4;
+            const shown = members.slice(0, limit);
+            const extra = members.length - limit;
+
+            return `
+                <div class="member-group">
+                    ${shown.map(m => `
+                        <div class="member-circle" title="${m.full_name}">
+                            ${initials(m.full_name)}
+                        </div>
+                    `).join('')}
+                    ${extra > 0 ? `<div class="member-circle" style="background:#374151">+${extra}</div>` : ''}
+                </div>
+            `;
         }
 
         async function searchUsers() {

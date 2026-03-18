@@ -120,7 +120,26 @@
         </nav>
 
         <div class="main-content">
+            <div id="view-org-settings" class="view">
+                <div class=" page-header">
+                    <h2>Organization Settings</h2>
+                    <button onclick="showView('orgs')" class="btn-secondary">Back</button>
+                </div>
 
+                <div class="settings-content" style="padding: 20px;">
+                    <div class="card">
+                        <h3>General Details</h3>
+                        <input type="text" id="edit-org-name" class="form-input">
+                        <textarea id="edit-org-desc" class="form-input"></textarea>
+                    </div>
+
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>Member Roles</h3>
+                        <div id="role-list-container">
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- DASHBOARD VIEW -->
             <div id="view-dashboard" class="view active">
                 <div class="page-header">

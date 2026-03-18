@@ -2,7 +2,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
-from app.models.membership import UserRole
 from app.schemas.project_schema import ProjectResponse
 
 class OrgBase(BaseModel):
@@ -13,14 +12,35 @@ class OrgBase(BaseModel):
 class OrganizationCreate(OrgBase):
     pass
 
+class OrganizationRoleRead(BaseModel):
+    id: str
+    role_name: str
+    
+    model_config = ConfigDict(from_attributes=True)
+class MembershipRead(BaseModel):
+    user_id: str
+    role: str  # e.g., "Organization Admin"
+    # job_title: Optional[str] = None # For future expansion
+    # user: Optional[UserRead] = None # If you want to nest user info
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class OrgRead(OrgBase):
-    id: str  # Change from UUID to str
-    owner_id: str  # Change from UUID to str
+    id: str
+    owner_id: str
     created_at: datetime
+    
+    # 1. The list of projects (already here)
     projects: List[ProjectResponse] = []
+    
+    # 2. The list of dynamic labels (Admin, Manager, Member, Weaver, etc.)
+    custom_roles: List[OrganizationRoleRead] = []
+    
+    # 3. The list of actual people in the org (for the Circles)
+    memberships: List[MembershipRead] = []
     
     model_config = ConfigDict(from_attributes=True)
 
 class OrgMemberAdd(BaseModel):
     user_id: str
-    role: str = "Members"
+    role: str = "Member"  # Default matches your seed
