@@ -153,7 +153,16 @@
             }
 
             if (res.status === 204) return null;
-            const data = await res.json();
+            // SAFE PARSING: Get text first to see if it's actually JSON
+            const text = await res.text();
+            let data;
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch (e) {
+                // If it's not JSON, it's likely a server-side crash (HTML error page)
+                throw new Error(`Server Error: ${res.status}. Please check backend logs.`);
+            }
+
             if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
             return data;
         }
@@ -506,41 +515,82 @@
 }
 
         function renderOrgSettings() {
-            const rolesContainer = document.getElementById('role-list-container');
-            const org = state.currentOrg; // Current active organization
+    const rolesContainer = document.getElementById('role-list-container');
+    const membersContainer = document.getElementById('org-members-list');
+    const org = state.currentOrg; 
 
-            if (!org || !org.custom_roles) return;
+    if (!org) return;
 
-            rolesContainer.innerHTML = org.custom_roles.map(role => `
-                <div class="role-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #374151; border-radius: 8px; margin-bottom: 8px;">
-                    <input type="text" value="${role.role_name}" id="input-role-${role.id}" 
-                        style="background: transparent; border: 1px solid transparent; color: white; flex-grow: 1; padding: 5px; font-weight: 500;"
-                        onfocus="this.style.border='1px solid #4f46e5'; this.style.background='#111827';"
-                        onblur="this.style.border='1px solid transparent'; this.style.background='transparent';">
-                    
-                    <div style="display: flex; gap: 8px; margin-left: 10px;">
-                        <button onclick="updateRoleName('${role.id}')" title="Save Name" style="background: none; border: none; color: #10b981; cursor: pointer;">
-                            <i class="fas fa-check"></i> Save
-                        </button>
-                        <button onclick="deleteRole('${role.id}')" title="Delete Role" style="background: none; border: none; color: #ef4444; cursor: pointer;">
-                            <i class="fas fa-trash"></i>
+    // --- 1. Render Roles ---
+    if (org.custom_roles && rolesContainer) {
+        rolesContainer.innerHTML = org.custom_roles.map(role => `
+            <div class="role-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #374151; border-radius: 8px; margin-bottom: 8px;">
+                <input type="text" value="${role.role_name}" id="input-role-${role.id}" 
+                    style="background: transparent; border: 1px solid transparent; color: white; flex-grow: 1; padding: 5px; font-weight: 500;">
+                <div style="display: flex; gap: 8px; margin-left: 10px;">
+                    <button onclick="updateRoleName('${role.id}')" style="background: none; border: none; color: #10b981; cursor: pointer;">
+                        <i class="fas fa-check"></i> Save
+                    </button>
+                    <button onclick="deleteRole('${role.id}')" style="background: none; border: none; color: #ef4444; cursor: pointer;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // --- 2. Render Members ---
+    if (org.memberships && membersContainer) {
+        if (org.memberships.length === 0) {
+            membersContainer.innerHTML = '<p class="text-dim">No members found.</p>';
+        } else {
+            membersContainer.innerHTML = org.memberships.map(m => `
+                <div class="member-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #374151;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="avatar-sm" style="background: #4f46e5; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">
+                            ${m.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <div style="font-weight: 500; color: white;">${m.user.name}</div>
+                            <div style="font-size: 12px; color: #9ca3af;">${m.user.email}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span class="badge" style="background: #1f2937; color: #818cf8; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">
+                            ${m.role}
+                        </span>
+                        <button onclick="removeMember('${m.user_id}')" title="Remove Member" style="background: none; border: none; color: #ef4444; cursor: pointer; opacity: 0.7;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                            <i class="fas fa-user-minus"></i>
                         </button>
                     </div>
                 </div>
             `).join('');
         }
+    }
+}
 
         async function openOrgSettings(orgId) {
-            // 1. Fetch the latest data using your new get_org_by_id logic
-            state.currentOrg = await api('GET', `/organizations/${orgId}`);
-            
-            // 2. Switch the view
-            showView('org-settings');
-            
-            // 3. Fill the UI
-            document.getElementById('edit-org-name').value = state.currentOrg.name;
-            document.getElementById('edit-org-desc').value = state.currentOrg.description || '';
-            renderOrgSettings();
+            if (!orgId) return;
+
+            try {
+                // 1. Fetch the full organization data
+                const org = await api('GET', `/organizations/${orgId}`);
+                
+                // 2. CRITICAL: Save to state so other functions can use it
+                state.currentOrg = org;
+                state.currentOrgId = org.id; 
+
+                // 3. Populate the text fields
+                document.getElementById('edit-org-name').value = org.name;
+                document.getElementById('edit-org-desc').value = org.description || '';
+
+                // 4. Show view and render lists
+                showView('org-settings');
+                renderOrgSettings();
+                
+            } catch (err) {
+                showToast("Failed to load settings: " + err.message, "error");
+            }
         }
 
         async function updateRoleName(roleId) {
@@ -575,6 +625,71 @@
             }
         }
 
+        async function addMemberToOrg() {
+            const email = document.getElementById('new-member-email').value;
+            try {
+                const response = await api('POST', `/organizations/${state.currentOrgId}/members`, { email });
+                showToast(response.message, "success");
+                renderOrgSettings(); // Refresh the list
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+        async function inviteMemberToOrg() {
+            const emailInput = document.getElementById('new-member-email');
+            const msgArea = document.getElementById('invite-message');
+            const email = emailInput.value.trim();
+
+            if (!email) {
+                msgArea.style.color = "#ef4444";
+                msgArea.textContent = "Please enter a valid email.";
+                return;
+            }
+
+            try {
+                // We use your existing api helper
+                const result = await api('POST', `/organizations/${state.currentOrgId}/members?email=${encodeURIComponent(email)}`);
+
+                // 1. UPDATE STATE FIRST
+                state.currentOrg = result;
+
+                // Success
+                msgArea.style.color = "#10b981";
+                msgArea.textContent = `Successfully added ${email}!`;
+                emailInput.value = ''; // Clear input
+                
+                // Refresh the member list immediately
+                renderOrgSettings(); 
+                
+            } catch (err) {
+                // Error (User not found, already a member, etc.)
+                msgArea.style.color = "#ef4444";
+                msgArea.textContent = err.message;
+            }
+        }
+
+        async function removeMember(userId) {
+            // Professional touch: always confirm before a destructive action
+            if (!confirm("Are you sure you want to remove this member? They will lose access to all projects in this organization.")) {
+                return;
+            }
+
+            try {
+                // 1. Call the API
+                const updatedOrg = await api('DELETE', `/organizations/${state.currentOrgId}/members/${userId}`);
+                
+                // 2. Update the local state with the new member list
+                state.currentOrg = updatedOrg;
+                
+                // 3. Re-render the settings view
+                renderOrgSettings();
+                
+                showToast("Member removed successfully", "success");
+            } catch (err) {
+                console.error("Removal failed:", err);
+                showToast(err.message || "Failed to remove member", "error");
+            }
+        }
         function openModal(type) {
             if (type === 'org') {
                 document.getElementById('org-modal-title').textContent = "New Organization";

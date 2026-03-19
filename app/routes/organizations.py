@@ -111,3 +111,30 @@ async def delete_org_role(
         await db.delete(role)
         await db.commit()
     return {"message": "Role deleted"}
+
+@router.post("/{org_id}/members", status_code=status.HTTP_201_CREATED)
+async def add_org_member(
+    org_id: str,
+    email: str, # You can also use a Pydantic schema here
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # 1. Check if the person adding is an Admin of this org
+    # (Assuming you have this helper in your service)
+    await OrganizationService.check_admin_access(db, org_id, current_user.id)
+
+    # 2. Call the service to perform the addition
+    return await OrganizationService.add_member_by_email(db, org_id, email)
+
+@router.delete("/{org_id}/members/{user_id}", response_model=OrgRead)
+async def remove_org_member(
+    org_id: str,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # 1. Security: Only allow admins to remove members
+    await OrganizationService.check_admin_access(db, org_id, current_user.id)
+    
+    # 2. Call the service to handle the deletion
+    return await OrganizationService.remove_member(db, org_id, user_id)

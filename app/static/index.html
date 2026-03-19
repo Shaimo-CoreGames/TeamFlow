@@ -139,6 +139,28 @@
                         </div>
                     </div>
                 </div>
+                <div class="card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px; color: white;">Add Member to Organization</h3>
+                    <p style="font-size: 0.85rem; color: #9ca3af; margin-bottom: 15px;">
+                        Search for a user by their registered email address to add them to your workspace.
+                    </p>
+
+                    <div style="display: flex; gap: 10px;">
+                        <input type="email" id="new-member-email" class="form-input" placeholder="user@example.com"
+                            style="flex: 1;">
+                        <button class="btn-primary" onclick="inviteMemberToOrg()" style="width: auto;">
+                            Add Member
+                        </button>
+                    </div>
+
+                    <div id="invite-message" style="margin-top: 10px; font-size: 0.85rem;"></div>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px; color: white;">Current Members</h3>
+                    <div id="org-members-list" class="members-list-container">
+                    </div>
+                </div>
             </div>
             <!-- DASHBOARD VIEW -->
             <div id="view-dashboard" class="view active">

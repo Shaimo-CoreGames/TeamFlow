@@ -43,7 +43,7 @@ class OrganizationService:
         membership = Membership(
             user_id=str(owner.id),
             organization_id=str(org.id),
-            role="Organization Admin", 
+            role="admin", 
         )
         db.add(membership)
 
@@ -73,20 +73,22 @@ class OrganizationService:
             )
 
     
+    # Ensure the name matches exactly what the router calls
     @staticmethod
-    async def _check_admin_access(db: AsyncSession, org_id: str, user_id: str):
-        # This checks if the user has an 'Organization Admin' role in the membership table
+    async def check_admin_access(db: AsyncSession, org_id: str, user_id: str):
+        # If your existing function is named _check_admin_access, 
+        # you can just rename it or point to it:
         result = await db.execute(
             select(Membership).where(
                 Membership.organization_id == org_id,
                 Membership.user_id == user_id,
-                Membership.role == "Organization Admin"
+                Membership.role == "admin"
             )
         )
         if not result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
-                detail="You do not have administrative access to this organization."
+                detail="Admin access required"
             )
         
     @staticmethod
@@ -173,3 +175,80 @@ class OrganizationService:
                 detail="Organization not found"
             )
         return org
+
+    @staticmethod
+    async def add_member_to_org(db: AsyncSession, org_id: str, email: str):
+        # 1. Find the user by email
+        user_result = await db.execute(select(User).where(User.email == email))
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 2. Check if they are already a member
+        existing = await db.execute(
+            select(Membership).where(
+                Membership.organization_id == org_id, 
+                Membership.user_id == user.id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="User is already a member")
+
+        # 3. Create the Membership
+        new_member = Membership(
+            organization_id=org_id,
+            user_id=user.id,
+            role="member" # Default role
+        )
+        db.add(new_member)
+        await db.commit()
+        return {"message": f"{user.name} added to organization"}
+    
+    @staticmethod
+    async def add_member_by_email(db: AsyncSession, org_id: str, email: str):
+        # 1. Find User
+        user_stmt = await db.execute(select(User).where(User.email == email))
+        user = user_stmt.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # 2. CHECK FOR DUPLICATES (The Fix)
+        existing = await db.execute(
+            select(Membership).where(
+                Membership.organization_id == org_id,
+                Membership.user_id == user.id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="User is already a member of this organization")
+
+        # 3. Create Membership
+        new_mem = Membership(organization_id=org_id, user_id=user.id, role="member")
+        db.add(new_mem)
+        await db.commit()
+    
+        return await OrganizationService.get_org_by_id(db, org_id)    
+    
+    @staticmethod
+    async def remove_member(db: AsyncSession, org_id: str, user_id: str):
+        # Find the membership record
+        result = await db.execute(
+            select(Membership).where(
+                Membership.organization_id == org_id,
+                Membership.user_id == user_id
+            )
+        )
+        membership = result.scalar_one_or_none()
+
+        if not membership:
+            raise HTTPException(status_code=404, detail="Member not found in this organization")
+
+        # Prevent removing the last admin or yourself if necessary
+        # (Optional: add logic here to prevent accidental lockouts)
+
+        await db.delete(membership)
+        await db.commit()
+
+        # Return the refreshed Org object so the UI updates immediately
+        return await OrganizationService.get_org_by_id(db, org_id)
