@@ -8,6 +8,7 @@ from app.models.membership import Membership
 from app.models.user import User
 from app.schemas.organization_schema import OrganizationCreate
 from app.models.org_role import OrganizationRole
+from app.models.invitation import Invitation
 
 class OrganizationService:
 
@@ -252,3 +253,78 @@ class OrganizationService:
 
         # Return the refreshed Org object so the UI updates immediately
         return await OrganizationService.get_org_by_id(db, org_id)
+    
+    @staticmethod
+    async def invite_member(db: AsyncSession, org_id: str, email: str, sender_id: str):
+        # 1. Check if already a member
+        existing_mem = await db.execute(
+            select(Membership).join(User).where(
+                Membership.organization_id == org_id,
+                User.email == email
+            )
+        )
+        if existing_mem.first():
+            raise HTTPException(status_code=400, detail="User is already a member")
+
+        # 2. Check if an invite is already pending
+        existing_invite = await db.execute(
+            select(Invitation).where(Invitation.organization_id == org_id, Invitation.email == email, Invitation.status == "pending")
+        )
+        if existing_invite.first():
+            raise HTTPException(status_code=400, detail="An invitation is already pending for this email")
+
+        # 3. Create the invitation
+        new_invite = Invitation(organization_id=org_id, email=email)
+        db.add(new_invite)
+        await db.commit()
+        return {"message": "Invitation sent successfully"}
+
+    @staticmethod
+    async def accept_invitation(db: AsyncSession, invite_id: str, user: User):
+        result = await db.execute(select(Invitation).where(Invitation.id == invite_id, Invitation.status == "pending"))
+        invite = result.scalar_one_or_none()
+
+        if not invite or invite.email != user.email:
+            raise HTTPException(status_code=404, detail="Invitation not found or unauthorized")
+
+        # 1. Create the Membership
+        new_member = Membership(organization_id=invite.organization_id, user_id=user.id, role=invite.role)
+        
+        # 2. Mark invite as accepted
+        invite.status = "accepted"
+        
+        db.add(new_member)
+        await db.commit()
+        return {"message": "Joined organization successfully"}
+
+        # Inside OrganizationService class in app/services/organization_service.py
+
+    @staticmethod
+    async def get_pending_invites_for_user(db: AsyncSession, email: str):
+        # We join with Organization to give the frontend the Org Name
+        result = await db.execute(
+            select(Invitation, Organization.name.label("organization_name"))
+            .join(Organization, Invitation.organization_id == Organization.id)
+            .where(Invitation.email == email, Invitation.status == "pending")
+        )
+        
+        invites = []
+        for row in result.all():
+            invite_data = row[0].__dict__.copy()
+            invite_data["organization_name"] = row[1]
+            invites.append(invite_data)
+        return invites
+
+    @staticmethod
+    async def decline_invitation(db: AsyncSession, invite_id: str, user: User):
+        result = await db.execute(
+            select(Invitation).where(Invitation.id == invite_id, Invitation.email == user.email)
+        )
+        invite = result.scalar_one_or_none()
+        
+        if not invite:
+            raise HTTPException(status_code=404, detail="Invitation not found")
+
+        invite.status = "declined"
+        await db.commit()
+        return {"message": "Invitation declined"}

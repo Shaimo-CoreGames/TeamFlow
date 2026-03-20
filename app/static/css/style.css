@@ -989,3 +989,29 @@ textarea.form-input {
     transform: translateY(-5px);
     z-index: 10;
 }
+
+
+
+/* ---------------------------------------------------- */
+#notifications-dropdown {
+    background-color: #1f2937 !important;
+    /* Dark Gray */
+    border: 1px solid #374151;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    min-width: 250px;
+}
+
+#notifications-dropdown h6 {
+    color: #9ca3af;
+    font-weight: 600;
+    padding: 0.75rem;
+    margin: 0;
+    border-bottom: 1px solid #374151;
+}
+
+.member-row.invite-pending {
+    background: rgba(59, 130, 246, 0.1);
+    /* Subtle blue tint */
+    border-left: 3px solid #3b82f6;
+}

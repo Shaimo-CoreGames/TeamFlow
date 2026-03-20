@@ -12,6 +12,7 @@ from app.models.user import User
 from app.services.user_service import UserService
 from app.dependencies.auth_dependency import get_current_user
 
+
 router = APIRouter(
     prefix="/users",
     tags=["Users"],
@@ -33,23 +34,6 @@ async def get_me(
     Returns currently authenticated user.
     """
     return current_user
-
-@router.get("/me/invitations")
-async def get_my_invitations(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # This joins ProjectMember with Project to get the name
-    stmt = select(
-        Project.id.label("project_id"), 
-        Project.name.label("project_name")
-    ).join(ProjectMember, Project.id == ProjectMember.project_id).where(
-        ProjectMember.user_id == current_user.id,
-        ProjectMember.status == "pending"
-    )
-    result = await db.execute(stmt)
-    return result.mappings().all()
-
 
 # --------------------------------------------------------
 # Search Users by Username or Email

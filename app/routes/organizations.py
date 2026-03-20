@@ -36,6 +36,14 @@ async def list_my_organizations(
     """Returns all organizations the current user belongs to"""
     return await OrganizationService.get_user_organizations(db, current_user)
 
+@router.get("/me/invites")
+async def get_my_invitations(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Called by checkInvitations() in JS to populate the bell icon"""
+    return await OrganizationService.get_pending_invites_for_user(db, current_user.email)
+
 @router.put("/{org_id}", response_model=OrgRead)
 async def update_org(
     org_id: str,
@@ -112,19 +120,24 @@ async def delete_org_role(
         await db.commit()
     return {"message": "Role deleted"}
 
-@router.post("/{org_id}/members", status_code=status.HTTP_201_CREATED)
-async def add_org_member(
+@router.post("/{org_id}/invite", status_code=status.HTTP_201_CREATED)
+async def invite_org_member(
     org_id: str,
-    email: str, # You can also use a Pydantic schema here
+    email: str, 
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # 1. Check if the person adding is an Admin of this org
-    # (Assuming you have this helper in your service)
-    await OrganizationService.check_admin_access(db, org_id, current_user.id)
+    # 1. Security Check: Only admins can invite
+    await OrganizationService.check_admin_access(db, org_id, str(current_user.id))
 
-    # 2. Call the service to perform the addition
-    return await OrganizationService.add_member_by_email(db, org_id, email)
+    # 2. Call the NEW invitation logic
+    # This creates a row in the Invitations table, NOT the Memberships table
+    return await OrganizationService.invite_member(
+        db=db, 
+        org_id=org_id, 
+        email=email, 
+        sender_id=str(current_user.id)
+    )
 
 @router.delete("/{org_id}/members/{user_id}", response_model=OrgRead)
 async def remove_org_member(
@@ -138,3 +151,20 @@ async def remove_org_member(
     
     # 2. Call the service to handle the deletion
     return await OrganizationService.remove_member(db, org_id, user_id)
+
+@router.post("/invites/{invite_id}/accept")
+async def accept_invitation(
+    invite_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Moves user from 'Invitation' to 'Membership' table"""
+    return await OrganizationService.accept_invitation(db, invite_id, current_user)
+
+@router.post("/invites/{invite_id}/decline")
+async def decline_invitation(
+    invite_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    return await OrganizationService.decline_invitation(db, invite_id, current_user)

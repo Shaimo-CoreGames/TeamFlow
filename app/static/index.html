@@ -110,6 +110,22 @@
                 <button class="nav-btn" onclick="showView('members')">Members</button>
                 <button class="nav-btn" onclick="showView('profile')">Profile</button>
             </div>
+            <div class="nav-item position-relative" id="notifications-wrapper" style="cursor: pointer;">
+                <i class="fas fa-bell" style="font-size: 1.2rem; color: #9ca3af;"></i>
+
+                <span id="invite-badge"
+                    class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                    style="display: none; font-size: 0.6rem;">
+                    0
+                </span>
+
+                <div id="notifications-dropdown" class="dropdown-menu-dark"
+                    style="display: none; position: absolute; right: 0; top: 40px; width: 300px; background: #1f2937; border: 1px solid #374151; border-radius: 8px; z-index: 1000; padding: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                    <h6 style="padding: 5px 10px; border-bottom: 1px solid #374151;">Pending Invitations</h6>
+                    <div id="invites-list" style="max-height: 300px; overflow-y: auto;">
+                    </div>
+                </div>
+            </div>
             <div class="topnav-right">
                 <div class="user-chip">
                     <div class="avatar" id="nav-avatar">U</div>
@@ -149,7 +165,7 @@
                         <input type="email" id="new-member-email" class="form-input" placeholder="user@example.com"
                             style="flex: 1;">
                         <button class="btn-primary" onclick="inviteMemberToOrg()" style="width: auto;">
-                            Add Member
+                            Invite Member
                         </button>
                     </div>
 

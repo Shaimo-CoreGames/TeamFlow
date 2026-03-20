@@ -247,6 +247,7 @@
                 showAuthError(e.message);
             }
         }
+
         async function doRegister() {
             const name = document.getElementById('reg-name').value.trim();
             const email = document.getElementById('reg-email').value.trim();
@@ -297,14 +298,25 @@
             }
         }
         function doLogout() {
-            state.token = null;
-            state.refreshToken = null;
-            state.user = null;
-            localStorage.removeItem('tf_token');
-            localStorage.removeItem('tf_refresh');
-            document.getElementById('app').style.display = 'none';
-            document.getElementById('auth-screen').style.display = 'flex';
-        }
+    // 1. Clear memory state
+    state.token = null;
+    state.refreshToken = null;
+    state.user = null;
+
+    // 2. Clear ALL storage keys used by Team Flow
+    localStorage.removeItem('tf_token');
+    localStorage.removeItem('tf_refresh');
+    localStorage.removeItem('tf_user'); // Add this if you save user info
+
+    // 3. Reset UI visibility
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    
+    // 4. Clear sensitive inputs (Optional but safer)
+    document.getElementById('login-password').value = '';
+    
+    console.log("Logged out successfully.");
+}
 
         // ===================================================
         // LOAD APP
@@ -328,7 +340,7 @@
 
     // 3. REFRESH EVERYTHING: Organizations AND Invitations
     await loadOrgs(); 
-    await loadInvitations(); // Ensure the "Invitations" section on the dashboard is updated
+    await checkInvitations(); // Ensure the "Invitations" section on the dashboard is updated
 
     const savedProjectId = localStorage.getItem('tf_last_project');
     
@@ -540,33 +552,52 @@
     }
 
     // --- 2. Render Members ---
-    if (org.memberships && membersContainer) {
-        if (org.memberships.length === 0) {
-            membersContainer.innerHTML = '<p class="text-dim">No members found.</p>';
-        } else {
-            membersContainer.innerHTML = org.memberships.map(m => `
+const membersList = org.memberships || []; 
+
+if (membersContainer) {
+    console.log("Current Org State:", org); // DEBUG: Check this in F12 console
+
+    if (membersList.length === 0) {
+        membersContainer.innerHTML = '<div class="p-4 text-center text-muted">No members found.</div>';
+    } else {
+        membersContainer.innerHTML = membersList.map(m => {
+            // 1. Safety check: Does the user object exist?
+            if (!m.user) {
+                console.warn("Membership found without user data:", m);
+                return ''; 
+            }
+
+            // 2. Handle different naming conventions (name vs full_name)
+            const name = m.user.full_name || m.user.name || m.user.username || "Unknown User";
+            const email = m.user.email || "No Email";
+            const initial = name.charAt(0).toUpperCase();
+
+            return `
                 <div class="member-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #374151;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div class="avatar-sm" style="background: #4f46e5; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white;">
-                            ${m.user.name.charAt(0).toUpperCase()}
+                            ${initial}
                         </div>
                         <div>
-                            <div style="font-weight: 500; color: white;">${m.user.name}</div>
-                            <div style="font-size: 12px; color: #9ca3af;">${m.user.email}</div>
+                            <div style="font-weight: 500; color: white;">${name}</div>
+                            <div style="font-size: 12px; color: #9ca3af;">${email}</div>
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <span class="badge" style="background: #1f2937; color: #818cf8; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">
                             ${m.role}
                         </span>
-                        <button onclick="removeMember('${m.user_id}')" title="Remove Member" style="background: none; border: none; color: #ef4444; cursor: pointer; opacity: 0.7;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
-                            <i class="fas fa-user-minus"></i>
-                        </button>
+                        ${m.user_id !== state.user.id ? `
+                            <button onclick="removeMember('${m.user_id}')" title="Remove Member" style="background: none; border: none; color: #ef4444; cursor: pointer;">
+                                <i class="fas fa-user-minus"></i>
+                            </button>
+                        ` : '<span style="font-size: 10px; color: #6b7280;">(You)</span>'}
                     </div>
                 </div>
-            `).join('');
-        }
+            `;
+        }).join('');
     }
+}
 }
 
         async function openOrgSettings(orgId) {
@@ -628,45 +659,150 @@
         async function addMemberToOrg() {
             const email = document.getElementById('new-member-email').value;
             try {
-                const response = await api('POST', `/organizations/${state.currentOrgId}/members`, { email });
-                showToast(response.message, "success");
-                renderOrgSettings(); // Refresh the list
+            const res = await api('POST', `/organizations/${orgId}/invite?email=${encodeURIComponent(email)}`);                showToast(response.message, "success");
+            renderOrgSettings(); // Refresh the list
             } catch (err) {
                 showToast(err.message, "error");
             }
         }
-        async function inviteMemberToOrg() {
-            const emailInput = document.getElementById('new-member-email');
-            const msgArea = document.getElementById('invite-message');
-            const email = emailInput.value.trim();
-
-            if (!email) {
-                msgArea.style.color = "#ef4444";
-                msgArea.textContent = "Please enter a valid email.";
+        async function renderInvites() {
+            const invites = await api('GET', '/users/me/invites'); // You'll need this route
+            const container = document.getElementById('invites-container');
+            
+            if (invites.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No pending invitations.</p>';
                 return;
             }
 
+            container.innerHTML = invites.map(inv => `
+                <div class="invite-card">
+                    <span>Invite to <strong>${inv.organization_name}</strong></span>
+                    <div class="actions">
+                        <button onclick="handleInvite('${inv.id}', 'accept')">Accept</button>
+                        <button class="text-red-500" onclick="handleInvite('${inv.id}', 'decline')">Decline</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function handleInvite(id, action) {
             try {
-                // We use your existing api helper
-                const result = await api('POST', `/organizations/${state.currentOrgId}/members?email=${encodeURIComponent(email)}`);
-
-                // 1. UPDATE STATE FIRST
-                state.currentOrg = result;
-
-                // Success
-                msgArea.style.color = "#10b981";
-                msgArea.textContent = `Successfully added ${email}!`;
-                emailInput.value = ''; // Clear input
-                
-                // Refresh the member list immediately
-                renderOrgSettings(); 
-                
+                await api('POST', `/invitations/${id}/${action}`);
+                showToast(`Invitation ${action}ed!`, "success");
+                initApp(); // Refresh everything
             } catch (err) {
-                // Error (User not found, already a member, etc.)
-                msgArea.style.color = "#ef4444";
-                msgArea.textContent = err.message;
+                showToast(err.message, "error");
             }
         }
+
+                // 1. Fetch and Update the UI
+        async function checkInvitations() {
+    try {
+        console.log("Checking for invites at: /organizations/me/invites");
+        // This is the correct endpoint for your Organization invites
+        const invites = await api('GET', '/organizations/me/invites'); 
+        
+        const badge = document.getElementById('invite-badge');
+        const list = document.getElementById('invites-list');
+
+        // Safety check: make sure these elements exist in your HTML
+        if (!list) return;
+
+        if (invites && invites.length > 0) {
+            if (badge) {
+                badge.innerText = invites.length;
+                badge.style.display = 'block';
+            }
+            
+            list.innerHTML = invites.map(inv => `
+                <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center" style="background: #1f2937;">
+                    <div>
+                        <strong style="color: white; font-size: 0.9rem;">${inv.organization_name}</strong>
+                        <p style="margin: 0; font-size: 0.75rem; color: #9ca3af;">Organization Invite</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button onclick="processInvite('${inv.id}', 'accept')" class="btn btn-sm btn-success">Accept</button>
+                        <button onclick="processInvite('${inv.id}', 'decline')" class="btn btn-sm btn-danger">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            if (badge) badge.style.display = 'none';
+            list.innerHTML = `
+                <div class="text-center py-4" style="color: #9ca3af;">
+                    <i class="fas fa-envelope-open mb-2" style="font-size: 1.5rem; opacity: 0.3;"></i>
+                    <p style="margin: 0; font-size: 0.85rem;">No pending invites</p>
+                </div>`;
+        }
+    } catch (err) {
+        console.error("Invitation Sync Error:", err);
+        const list = document.getElementById('invites-list');
+        if (list) list.innerHTML = `<p class="text-danger p-2" style="font-size: 0.7rem;">Connection error</p>`;
+    }
+}
+
+        async function processInvite(id, action) {
+            try {
+                // action will be 'accept' or 'decline'
+                // Endpoint: /organizations/invites/{id}/accept
+                await api('POST', `/organizations/invites/${id}/${action}`);
+                
+                showToast(`Invitation ${action}ed!`, "success");
+                
+                // Refresh the organizations list in the sidebar
+                await loadMyOrganizations(); 
+                
+                // Refresh the bell icon/notification list
+                await checkInvitations(); 
+                
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        // 3. Toggle Dropdown Visibility
+        document.getElementById('notifications-wrapper').addEventListener('click', (e) => {
+            const dropdown = document.getElementById('notifications-dropdown');
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            e.stopPropagation();
+        });
+
+        // Close dropdown if clicking outside
+        window.addEventListener('click', () => {
+            document.getElementById('notifications-dropdown').style.display = 'none';
+        });
+
+
+        async function inviteMemberToOrg() {
+    const emailInput = document.getElementById('new-member-email');
+    const msgArea = document.getElementById('invite-message');
+    const email = emailInput.value.trim();
+
+    if (!email) {
+        msgArea.style.color = "#ef4444";
+        msgArea.textContent = "Please enter a valid email.";
+        return;
+    }
+
+    try {
+        // FIX 1: Change '/members' to '/invite' to match your new FastAPI route
+        // FIX 2: Added /organizations prefix (if your API helper doesn't add it)
+        const result = await api('POST', `/organizations/${state.currentOrgId}/invite?email=${encodeURIComponent(email)}`);
+
+        // Success
+        msgArea.style.color = "#10b981";
+        // Update the message to reflect it's an invite, not a direct add
+        msgArea.textContent = `Invitation sent to ${email}!`;
+        emailInput.value = ''; 
+        
+        // Note: We don't update state.currentOrg here anymore because 
+        // the user isn't a member yet—they are just "pending."
+        
+    } catch (err) {
+        msgArea.style.color = "#ef4444";
+        msgArea.textContent = err.message;
+    }
+}
 
         async function removeMember(userId) {
             // Professional touch: always confirm before a destructive action
@@ -690,6 +826,22 @@
                 showToast(err.message || "Failed to remove member", "error");
             }
         }
+
+        async function cancelInvitation(inviteId) {
+    if (!confirm("Cancel this pending invitation?")) return;
+
+    try {
+        // This hits the new invitation decline/cancel endpoint
+        await api('POST', `/organizations/invites/${inviteId}/decline`);
+        
+        showToast("Invitation cancelled", "success");
+        
+        // Refresh the settings to update the "Pending" list
+        renderOrgSettings(); 
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
         function openModal(type) {
             if (type === 'org') {
                 document.getElementById('org-modal-title').textContent = "New Organization";
@@ -1169,29 +1321,29 @@
             }
         }
 
-        async function handleInvite(action) {
-            const overlay = document.getElementById('modal-invite-overlay');
-            const inviteId = overlay.dataset.inviteId;
+        // async function handleInvite(action) {
+        //     const overlay = document.getElementById('modal-invite-overlay');
+        //     const inviteId = overlay.dataset.inviteId;
 
-            try {
-                // 1. Tell the backend the user accepted
-                await api('POST', `/users/invitations/${inviteId}/respond?action=${action}`);
+        //     try {
+        //         // 1. Tell the backend the user accepted
+        //         await api('POST', `/users/invitations/${inviteId}/respond?action=${action}`);
                 
-                if (action === 'accepted') {
-                    showToast("Joined project successfully!", "success");
-                    // 2. CRITICAL: Refresh the organizations list so the new org shows up
-                    await loadOrgs(); 
-                    renderOrgs();
-                } else {
-                    showToast("Invitation declined", "info");
-                }
-            } catch (err) {
-                console.error("Failed to respond:", err);
-            } finally {
-                // 3. Always hide the modal to prevent freezing
-                overlay.style.display = 'none';
-            }
-        }
+        //         if (action === 'accepted') {
+        //             showToast("Joined project successfully!", "success");
+        //             // 2. CRITICAL: Refresh the organizations list so the new org shows up
+        //             await loadOrgs(); 
+        //             renderOrgs();
+        //         } else {
+        //             showToast("Invitation declined", "info");
+        //         }
+        //     } catch (err) {
+        //         console.error("Failed to respond:", err);
+        //     } finally {
+        //         // 3. Always hide the modal to prevent freezing
+        //         overlay.style.display = 'none';
+        //     }
+        // }
 
         async function saveTask() {
             const title = document.getElementById('task-title').value;
@@ -1554,7 +1706,7 @@
         async function renderDashboard() {
             // 1. Update stats and load invitations first
             updateStats();
-            await loadInvitations(); // This ensures invites show up regardless of task count
+            await checkInvitations(); // This ensures invites show up regardless of task count
 
             // 2. Recent tasks logic
             const el = document.getElementById('dash-tasks');
@@ -1624,81 +1776,41 @@
             });
         });
 
-        // 1. Define the functions at the very top level (not inside anything else)
-        async function loadInvitations() {
-            console.log("Fetching invitations...");
-            const container = document.getElementById('invites-list');
-            const section = document.getElementById('invites-section');
-            
-            if (!container || !section) return;
-
-            // Ensure section is always visible
-            section.style.display = 'block';
-
-            try {
-                const invites = await api('GET', 'users/me/invitations');
-                
-                if (!invites || invites.length === 0) {
-                    // Show empty state instead of hiding
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: #9ca3af; border: 1px dashed #4b5563; border-radius: 8px;">
-                            <p style="margin: 0; font-size: 0.9rem;">No pending invitations</p>
-                        </div>`;
-                    return;
-                }
-
-                // Render invites if they exist
-                container.innerHTML = invites.map(invite => `
-                    <div class="invite-card" style="background: #1f2937; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 10px; border: 1px solid #4f46e5;">
-                        <div>
-                            <strong style="color: white;">${invite.project_name}</strong>
-                            <p style="color: #9ca3af; margin: 0; font-size: 0.8rem;">Project Invitation</p>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button onclick="respondInvite('${invite.project_id}', 'accepted')" style="background: #10b981; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Accept</button>
-                            <button onclick="respondInvite('${invite.project_id}', 'declined')" style="background: #ef4444; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Decline</button>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (err) {
-                console.error("Error loading invites:", err);
-                container.innerHTML = `<p style="color: #ef4444; font-size: 0.8rem;">Failed to load invitations.</p>`;
-            }
-}
-
-        async function respondInvite(projectId, response) {
-            try {
-                // Send the response to the backend
-                await api('POST', `projects/${projectId}/respond-invite?response=${response}`);
-                
-                showToast(`Invitation ${response}!`, "success");
-
-                // 1. Refresh the invitations list (this makes it "vanish" from pending)
-                await loadInvitations(); 
-                
-                // 2. Refresh the projects list (this makes the new project appear in their sidebar)
-                if (response === 'accepted') {
-                    await loadProjects(); 
-                }
-                
-                // 3. Update the dashboard stats
-                await renderDashboard(); 
-            } catch (err) {
-                console.error("Error responding to invite:", err);
-                showToast("Failed to respond to invitation", "error");
-            }
-        }
-
-        window.loadInvitations = loadInvitations;
-        window.respondInvite = respondInvite;
-
         // ===================================================
         // INIT
         // ===================================================
         (async function init() {
-            if (state.token) {
-                await loadApp();
-            }
-        })();
+    // Look for the specific 'tf_' keys you set in doLogout
+    const savedToken = localStorage.getItem('tf_token');
+    const savedRefresh = localStorage.getItem('tf_refresh');
 
+    if (savedToken) {
+        state.token = savedToken;
+        state.refreshToken = savedRefresh;
         
+        // If you save user object as a string, parse it back
+        const savedUser = localStorage.getItem('tf_user');
+        if (savedUser) state.user = JSON.parse(savedUser);
+
+        try {
+            // Switch UI before loading data for a faster feel
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app').style.display = 'flex';
+
+            await Promise.all([
+                loadMyOrganizations(),
+                checkInvitations()
+            ]);
+            
+            await loadApp();
+            
+        } catch (err) {
+            console.error("Session expired or invalid:", err);
+            doLogout(); 
+        }
+    } else {
+        // No token? Show login
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('auth-screen').style.display = 'flex';
+    }
+})();
