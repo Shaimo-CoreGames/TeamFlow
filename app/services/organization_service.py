@@ -97,19 +97,20 @@ class OrganizationService:
         db: AsyncSession,
         user: User,
     ):
-        # We must explicitly load EVERY relationship mentioned in the OrgRead schema
         result = await db.execute(
             select(Organization)
             .join(Membership)
             .options(
                 selectinload(Organization.projects),
-                selectinload(Organization.custom_roles),     # <--- ADD THIS
-                selectinload(Organization.memberships)       # <--- ADD THIS
+                selectinload(Organization.custom_roles),
+                # CRITICAL FIX: You must chain selectinload to get the user data
+                selectinload(Organization.memberships).selectinload(Membership.user) 
             )
             .where(Membership.user_id == str(user.id)) 
         )
-        return result.scalars().all()
-
+        # Use .unique() to prevent duplicate orgs if a user has multiple roles/entries
+        return result.scalars().unique().all()
+    
     @staticmethod
     async def update_organization(db: AsyncSession, org_id: str, org_data: OrganizationCreate, current_user):
         # 1. RBAC Check: Must be 'Organization Admin'
@@ -255,7 +256,7 @@ class OrganizationService:
         return await OrganizationService.get_org_by_id(db, org_id)
     
     @staticmethod
-    async def invite_member(db: AsyncSession, org_id: str, email: str, sender_id: str):
+    async def invite_member(db: AsyncSession, org_id: str, email: str, sender_id: str, role: str = "Member"):
         # 1. Check if already a member
         existing_mem = await db.execute(
             select(Membership).join(User).where(
@@ -274,30 +275,45 @@ class OrganizationService:
             raise HTTPException(status_code=400, detail="An invitation is already pending for this email")
 
         # 3. Create the invitation
-        new_invite = Invitation(organization_id=org_id, email=email)
+        new_invite = Invitation(
+        organization_id=org_id, 
+        email=email, 
+        role=role, 
+        invited_by=sender_id # Good practice to track who sent it
+        )
         db.add(new_invite)
         await db.commit()
-        return {"message": "Invitation sent successfully"}
+        return {"message": f"Invitation sent successfully as {role}"}
 
     @staticmethod
-    async def accept_invitation(db: AsyncSession, invite_id: str, user: User):
-        result = await db.execute(select(Invitation).where(Invitation.id == invite_id, Invitation.status == "pending"))
+    async def accept_invitation(db: AsyncSession, invite_id: str, current_user: User):
+        # 1. Find the invitation
+        result = await db.execute(
+            select(Invitation).where(Invitation.id == invite_id, Invitation.status == "pending")
+        )
         invite = result.scalar_one_or_none()
 
-        if not invite or invite.email != user.email:
-            raise HTTPException(status_code=404, detail="Invitation not found or unauthorized")
+        if not invite:
+            raise HTTPException(status_code=404, detail="Invitation not found or already processed")
 
-        # 1. Create the Membership
-        new_member = Membership(organization_id=invite.organization_id, user_id=user.id, role=invite.role)
+        # 2. Check if email matches (Security)
+        if invite.email != current_user.email:
+            raise HTTPException(status_code=403, detail="This invitation was not sent to you")
+
+        # 3. Create the Membership using the ROLE from the invitation
+        new_member = Membership(
+            user_id=current_user.id,
+            organization_id=invite.organization_id,
+            role=invite.role  # <--- CRITICAL: Use the role stored when invited!
+        )
         
-        # 2. Mark invite as accepted
+        # 4. Update invite status to 'accepted' (or delete it)
         invite.status = "accepted"
         
         db.add(new_member)
         await db.commit()
-        return {"message": "Joined organization successfully"}
-
-        # Inside OrganizationService class in app/services/organization_service.py
+        
+        return {"message": f"Successfully joined as {invite.role}"}
 
     @staticmethod
     async def get_pending_invites_for_user(db: AsyncSession, email: str):

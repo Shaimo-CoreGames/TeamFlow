@@ -552,25 +552,18 @@
     }
 
     // --- 2. Render Members ---
-const membersList = org.memberships || []; 
+const membersList = org.memberships || [];
 
 if (membersContainer) {
-    console.log("Current Org State:", org); // DEBUG: Check this in F12 console
-
     if (membersList.length === 0) {
         membersContainer.innerHTML = '<div class="p-4 text-center text-muted">No members found.</div>';
     } else {
         membersContainer.innerHTML = membersList.map(m => {
-            // 1. Safety check: Does the user object exist?
-            if (!m.user) {
-                console.warn("Membership found without user data:", m);
-                return ''; 
-            }
-
-            // 2. Handle different naming conventions (name vs full_name)
-            const name = m.user.full_name || m.user.name || m.user.username || "Unknown User";
-            const email = m.user.email || "No Email";
+            // Check if 'user' object exists. If not, don't crash, just show a placeholder
+            const name = m.user ? (m.user.full_name || m.user.name || "Unknown") : "Unknown User";
+            const email = m.user ? (m.user.email || "") : "No Email";
             const initial = name.charAt(0).toUpperCase();
+            const roleName = m.role || "Member"; // Fallback if role is null
 
             return `
                 <div class="member-row" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #374151;">
@@ -584,19 +577,30 @@ if (membersContainer) {
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <span class="badge" style="background: #1f2937; color: #818cf8; padding: 4px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">
-                            ${m.role}
+                        <span class="badge" style="background: #1f2937; color: #818cf8; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                            ${roleName}
                         </span>
-                        ${m.user_id !== state.user.id ? `
-                            <button onclick="removeMember('${m.user_id}')" title="Remove Member" style="background: none; border: none; color: #ef4444; cursor: pointer;">
+                        ${(m.user && m.user.id !== state.user.id) ? `
+                            <button onclick="removeMember('${m.user.id}')" style="background: none; border: none; color: #ef4444; cursor: pointer;">
                                 <i class="fas fa-user-minus"></i>
                             </button>
-                        ` : '<span style="font-size: 10px; color: #6b7280;">(You)</span>'}
+                        ` : ''}
                     </div>
                 </div>
             `;
         }).join('');
     }
+}
+const inviteRoleSelect = document.getElementById('new-member-role');
+if (inviteRoleSelect && org.custom_roles) {
+    // Default options + your custom ones
+    const baseRoles = ['Admin', 'Manager', 'Member'];
+    const customRoles = org.custom_roles.map(r => r.role_name);
+    const allRoles = [...new Set([...baseRoles, ...customRoles])]; // Unique list
+
+    inviteRoleSelect.innerHTML = allRoles.map(role => 
+        `<option value="${role}">${role}</option>`
+    ).join('');
 }
 }
 
@@ -740,6 +744,17 @@ if (membersContainer) {
         if (list) list.innerHTML = `<p class="text-danger p-2" style="font-size: 0.7rem;">Connection error</p>`;
     }
 }
+        async function loadInvitations() {
+            try {
+                // Match this to your working backend route
+                const response = await api('GET', '/organizations/me/invites');
+                state.invitations = response || [];
+                console.log("Invitations loaded:", state.invitations);
+            } catch (err) {
+                console.warn("Invitations route not found or failed:", err.message);
+                state.invitations = [];
+            }
+        }
 
         async function processInvite(id, action) {
             try {
@@ -750,7 +765,7 @@ if (membersContainer) {
                 showToast(`Invitation ${action}ed!`, "success");
                 
                 // Refresh the organizations list in the sidebar
-                await loadMyOrganizations(); 
+                await loadOrgs(); 
                 
                 // Refresh the bell icon/notification list
                 await checkInvitations(); 
@@ -773,31 +788,23 @@ if (membersContainer) {
         });
 
 
-        async function inviteMemberToOrg() {
+       async function inviteMemberToOrg() {
     const emailInput = document.getElementById('new-member-email');
+    const roleSelect = document.getElementById('new-member-role'); // Grab the dropdown value
     const msgArea = document.getElementById('invite-message');
+    
     const email = emailInput.value.trim();
+    const role = roleSelect.value; 
 
-    if (!email) {
-        msgArea.style.color = "#ef4444";
-        msgArea.textContent = "Please enter a valid email.";
-        return;
-    }
+    if (!email) return;
 
     try {
-        // FIX 1: Change '/members' to '/invite' to match your new FastAPI route
-        // FIX 2: Added /organizations prefix (if your API helper doesn't add it)
-        const result = await api('POST', `/organizations/${state.currentOrgId}/invite?email=${encodeURIComponent(email)}`);
+        // We pass the role as a query parameter just like the email
+        await api('POST', `/organizations/${state.currentOrgId}/invite?email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`);
 
-        // Success
         msgArea.style.color = "#10b981";
-        // Update the message to reflect it's an invite, not a direct add
-        msgArea.textContent = `Invitation sent to ${email}!`;
+        msgArea.textContent = `Invited as ${role}!`;
         emailInput.value = ''; 
-        
-        // Note: We don't update state.currentOrg here anymore because 
-        // the user isn't a member yet—they are just "pending."
-        
     } catch (err) {
         msgArea.style.color = "#ef4444";
         msgArea.textContent = err.message;
@@ -1321,30 +1328,6 @@ if (membersContainer) {
             }
         }
 
-        // async function handleInvite(action) {
-        //     const overlay = document.getElementById('modal-invite-overlay');
-        //     const inviteId = overlay.dataset.inviteId;
-
-        //     try {
-        //         // 1. Tell the backend the user accepted
-        //         await api('POST', `/users/invitations/${inviteId}/respond?action=${action}`);
-                
-        //         if (action === 'accepted') {
-        //             showToast("Joined project successfully!", "success");
-        //             // 2. CRITICAL: Refresh the organizations list so the new org shows up
-        //             await loadOrgs(); 
-        //             renderOrgs();
-        //         } else {
-        //             showToast("Invitation declined", "info");
-        //         }
-        //     } catch (err) {
-        //         console.error("Failed to respond:", err);
-        //     } finally {
-        //         // 3. Always hide the modal to prevent freezing
-        //         overlay.style.display = 'none';
-        //     }
-        // }
-
         async function saveTask() {
             const title = document.getElementById('task-title').value;
             const projectId = state.currentProjectId; // Must be set when you enter a project view
@@ -1798,7 +1781,7 @@ if (membersContainer) {
             document.getElementById('app').style.display = 'flex';
 
             await Promise.all([
-                loadMyOrganizations(),
+                loadOrgs(),
                 checkInvitations()
             ]);
             

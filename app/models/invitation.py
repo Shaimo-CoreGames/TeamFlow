@@ -12,3 +12,4 @@ class Invitation(Base):
     role = Column(String(50), default="member")
     status = Column(String(20), default="pending") # pending, accepted, declined
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    invited_by = Column(String, ForeignKey("users.id"), nullable=True)

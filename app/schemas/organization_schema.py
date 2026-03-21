@@ -3,15 +3,14 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
 from app.schemas.project_schema import ProjectResponse
+from app.schemas.user_schema import UserResponse
 
 class OrgBase(BaseModel):
     name: str
     slug: str = Field(..., description="Unique URL-friendly identifier")
     description: Optional[str] = None
-
 class OrganizationCreate(OrgBase):
     pass
-
 class OrganizationRoleRead(BaseModel):
     id: str
     role_name: str
@@ -21,10 +20,9 @@ class MembershipRead(BaseModel):
     user_id: str
     role: str  # e.g., "Organization Admin"
     # job_title: Optional[str] = None # For future expansion
-    # user: Optional[UserRead] = None # If you want to nest user info
+    user: Optional[UserResponse] = None # If you want to nest user info
     
     model_config = ConfigDict(from_attributes=True)
-
 class OrgRead(OrgBase):
     id: str
     owner_id: str
@@ -40,7 +38,6 @@ class OrgRead(OrgBase):
     memberships: List[MembershipRead] = []
     
     model_config = ConfigDict(from_attributes=True)
-
 class OrgMemberAdd(BaseModel):
     user_id: str
     role: str = "Member"  # Default matches your seed

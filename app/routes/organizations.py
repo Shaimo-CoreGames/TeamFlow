@@ -124,18 +124,17 @@ async def delete_org_role(
 async def invite_org_member(
     org_id: str,
     email: str, 
+    role: str = "Member", # Default to 'Member' if not provided
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # 1. Security Check: Only admins can invite
     await OrganizationService.check_admin_access(db, org_id, str(current_user.id))
 
-    # 2. Call the NEW invitation logic
-    # This creates a row in the Invitations table, NOT the Memberships table
     return await OrganizationService.invite_member(
         db=db, 
         org_id=org_id, 
         email=email, 
+        role=role, # Pass the role to the service
         sender_id=str(current_user.id)
     )
 

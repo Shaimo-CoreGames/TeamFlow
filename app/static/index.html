@@ -161,11 +161,19 @@
                         Search for a user by their registered email address to add them to your workspace.
                     </p>
 
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <input type="email" id="new-member-email" class="form-input" placeholder="user@example.com"
-                            style="flex: 1;">
+                            style="flex: 2;">
+
+                        <select id="new-member-role" class="form-input"
+                            style="flex: 1; background-color: #374151; color: white; border: 1px solid #4b5563;">
+                            <option value="Member">Member</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+
                         <button class="btn-primary" onclick="inviteMemberToOrg()" style="width: auto;">
-                            Invite Member
+                            Invite
                         </button>
                     </div>
 
