@@ -11,8 +11,7 @@ from app.schemas.project_schema import (
     ProjectResponse,
     ProjectUpdate,
 )
-from app.models.membership import ProjectMember
-from app.schemas.user_schema import InviteUserRequest
+from app.models.membership import ProjectMember,Membership
 from app.services.project_service import ProjectService
 from app.dependencies.auth_dependency import get_current_user
 from app.models.user import User
@@ -67,86 +66,74 @@ async def delete_project(
         user=current_user,
     )
 
+# app/routes/projects.py
+
 @router.get("/organizations/{org_id}/projects", response_model=List[ProjectResponse])
 async def list_projects(
     org_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # This connects the Route to the Service you just fixed!
-    return await ProjectService.get_organization_projects(db, org_id)
+    # Pass current_user to the service for filtering
+    return await ProjectService.get_organization_projects(db, org_id, current_user)
 
-@router.post("/projects/{project_id}/invite", status_code=status.HTTP_201_CREATED)
-async def invite_user_to_project(
+
+@router.post("/projects/{project_id}/members")
+async def add_project_member(
     project_id: str,
-    request: InviteUserRequest,
+    payload: dict,  # Expecting {"email": "user@example.com"}
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Verify the project exists
-    project_query = select(Project).where(Project.id == project_id)
-    project_result = await db.execute(project_query)
-    project = project_result.scalars().first()
-    
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    # 1. Fetch Project to get the Organization ID
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # 2. Check if the user is already invited or a member
-    membership_query = select(ProjectMember).where(
-        ProjectMember.project_id == project_id,
-        ProjectMember.user_id == request.user_id
-    )
-    membership_result = await db.execute(membership_query)
-    existing_membership = membership_result.scalars().first()
+    # 2. Find the target user by email
+    user_result = await db.execute(select(User).where(User.email == email))
+    target_user = user_result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found in system")
 
-    if existing_membership:
+    # 3. VERIFY: Is this user a member of the project's Organization?
+    org_member_check = await db.execute(
+        select(Membership).where(
+            Membership.organization_id == project.organization_id,
+            Membership.user_id == str(target_user.id)
+        )
+    )
+    if not org_member_check.scalar_one_or_none():
         raise HTTPException(
-            status_code=400, 
-            detail="User is already a member or has a pending invitation"
+            status_code=403, 
+            detail="User must be a member of the Organization first"
         )
 
-    # 3. Create the new pending membership
-    new_invite = ProjectMember(
-        project_id=project_id,
-        user_id=request.user_id,
-        role="member",      # Default role
-        status="pending"    # This is the "Invitation" state
+    # 4. Check if already in the project
+    existing = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == str(target_user.id)
+        )
     )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="User is already a project member")
 
-    db.add(new_invite)
+    # 5. Success: Create Project Membership
+    new_member = ProjectMember(
+        project_id=project_id,
+        user_id=str(target_user.id)
+    )
+    db.add(new_member)
+    
     try:
         await db.commit()
+        return {"message": "Member added to project successfully"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Database error during invitation")
-
-    return {"message": "Invitation sent successfully"}
-
-@router.post("/projects/{project_id}/respond-invite")
-async def respond_to_invite(
-    project_id: str,
-    response: str, # "accepted" or "declined"
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Find the pending invitation
-    stmt = select(ProjectMember).where(
-        ProjectMember.project_id == project_id,
-        ProjectMember.user_id == current_user.id,
-        ProjectMember.status == "pending"
-    )
-    result = await db.execute(stmt)
-    membership = result.scalar_one_or_none()
-
-    if not membership:
-        raise HTTPException(status_code=404, detail="Invitation not found")
-
-    if response == "accepted":
-        membership.status = "accepted"
-        membership.role = "member" # Or whatever default role you prefer
-    else:
-        # If declined, we can just delete the record
-        await db.delete(membership)
-    
-    await db.commit()
-    return {"message": f"Invitation {response}"}
+        raise HTTPException(status_code=500, detail="Database error during assignment")

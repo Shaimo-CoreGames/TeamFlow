@@ -1015,3 +1015,24 @@ textarea.form-input {
     /* Subtle blue tint */
     border-left: 3px solid #3b82f6;
 }
+
+
+/* ------------------------------------------------------- */
+.input-field {
+    background: #1f2937;
+    border: 1px solid #374151;
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.input-field:focus {
+    border-color: #4f46e5;
+}
+
+select.input-field option {
+    background: #1f2937;
+    color: white;
+}

@@ -60,7 +60,8 @@ async def get_organization(
     current_user = Depends(get_current_user)
 ):
     # This calls the helper we wrote in the Service
-    return await OrganizationService.get_org_by_id(db, org_id)
+    return await OrganizationService.get_org_by_id(db, org_id, current_user)
+
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_org(
     org_id: str,
@@ -69,8 +70,6 @@ async def delete_org(
 ):
     await OrganizationService.delete_organization(db, org_id, current_user)
     return None # HTTP 204 requires no body
-
-
 
 @router.put("/{org_id}/roles/{role_id}", response_model=OrgRead)
 async def update_org_role(
@@ -97,7 +96,7 @@ async def update_org_role(
     await db.commit()
     
     # Return the whole Org so the frontend state stays in sync
-    return await OrganizationService.get_org_by_id(db, org_id)
+    return await OrganizationService.get_org_by_id(db, org_id, current_user)
 
 @router.delete("/{org_id}/roles/{role_id}")
 async def delete_org_role(

@@ -11,7 +11,7 @@ class Membership(Base):
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     # Ensure this matches what your Service/Queries use
     organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False) 
-    role: Mapped[str] = mapped_column(String(50), default="member")
+    role: Mapped[str] = mapped_column(String(50), default="Member")
     
     user = relationship("User", back_populates="memberships")
     organization = relationship("Organization", back_populates="memberships")

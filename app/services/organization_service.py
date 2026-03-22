@@ -4,11 +4,12 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.models.organization import Organization
-from app.models.membership import Membership
+from app.models.membership import ProjectMember,Membership
 from app.models.user import User
 from app.schemas.organization_schema import OrganizationCreate
 from app.models.org_role import OrganizationRole
 from app.models.invitation import Invitation
+from app.models.project import Project
 
 class OrganizationService:
 
@@ -73,12 +74,8 @@ class OrganizationService:
                 detail="Failed to initialize organization and roles."
             )
 
-    
-    # Ensure the name matches exactly what the router calls
     @staticmethod
     async def check_admin_access(db: AsyncSession, org_id: str, user_id: str):
-        # If your existing function is named _check_admin_access, 
-        # you can just rename it or point to it:
         result = await db.execute(
             select(Membership).where(
                 Membership.organization_id == org_id,
@@ -91,61 +88,123 @@ class OrganizationService:
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Admin access required"
             )
-        
+
     @staticmethod
-    async def get_user_organizations(
-        db: AsyncSession,
-        user: User,
-    ):
-        result = await db.execute(
-            select(Organization)
-            .join(Membership)
-            .options(
-                selectinload(Organization.projects),
-                selectinload(Organization.custom_roles),
-                # CRITICAL FIX: You must chain selectinload to get the user data
-                selectinload(Organization.memberships).selectinload(Membership.user) 
+    async def get_user_organizations(db: AsyncSession, user: User):
+            # 1. Fetch organizations where the user is a member
+            result = await db.execute(
+                select(Organization)
+                .join(Membership)
+                .options(
+                    selectinload(Organization.custom_roles),
+                    selectinload(Organization.memberships).selectinload(Membership.user),
+                    selectinload(Organization.projects)
+                        .selectinload(Project.project_members)
+                        .selectinload(ProjectMember.user)
+                )
+                .where(Membership.user_id == str(user.id))
             )
-            .where(Membership.user_id == str(user.id)) 
+            
+            orgs = result.scalars().unique().all()
+
+            # 2. Apply Privacy Filter
+            for org in orgs:
+                # Check if current user is Admin of THIS org
+                user_membership = next((m for m in org.memberships if m.user_id == str(user.id)), None)
+                is_admin = user_membership and user_membership.role.lower() == "admin"
+
+                if not is_admin:
+                    # Amir (Member) sees only projects he is specifically added to
+                    # If he's added to 0 projects, org.projects becomes []
+                    org.projects = [
+                        p for p in org.projects 
+                        if any(pm.user_id == str(user.id) for pm in p.project_members)
+                    ]
+            
+            return orgs
+
+    @staticmethod
+    async def get_organization_projects(db: AsyncSession, org_id: str, user: User):
+        # 1. Check the user's role in the Organization
+        membership_result = await db.execute(
+            select(Membership).where(
+                Membership.organization_id == org_id,
+                Membership.user_id == str(user.id)
+            )
         )
-        # Use .unique() to prevent duplicate orgs if a user has multiple roles/entries
-        return result.scalars().unique().all()
+        membership = membership_result.scalar_one_or_none()
+        
+        if not membership:
+            return [] # User isn't even in this org
+
+        is_admin = membership.role.lower() == "admin"
+
+        # 2. Fetch Projects with their members loaded
+        query = select(Project).where(Project.organization_id == org_id).options(
+            selectinload(Project.project_members).selectinload(ProjectMember.user)
+        )
+        
+        result = await db.execute(query)
+        projects = result.scalars().unique().all()
+
+        # 3. Apply the Privacy Filter
+        if is_admin:
+            # Admins see everything in the "Admin Portal" view
+            return projects
+        else:
+            # Regular members ONLY see projects they are part of
+            return [
+                p for p in projects 
+                if any(pm.user_id == str(user.id) for pm in p.project_members)
+            ]
+    
     
     @staticmethod
     async def update_organization(db: AsyncSession, org_id: str, org_data: OrganizationCreate, current_user):
         # 1. RBAC Check: Must be 'Organization Admin'
-        await OrganizationService._check_admin_access(db, org_id, str(current_user.id))
+        await OrganizationService.check_admin_access(db, org_id, str(current_user.id))
 
+        # 2. Fetch the existing organization
         result = await db.execute(
-            select(Organization)
-            .options(
-                selectinload(Organization.projects),
-                selectinload(Organization.custom_roles),
-                selectinload(Organization.memberships)
-            )
-            .where(Organization.id == org_id)
+            select(Organization).where(Organization.id == org_id)
         )
         org = result.scalar_one_or_none()
         
         if not org:
             raise HTTPException(status_code=404, detail="Organization not found")
 
+        # 3. Update the fields
         org.name = org_data.name
         org.slug = org_data.slug
         org.description = org_data.description
         
         try:
             await db.commit()
-            await db.refresh(org, attribute_names=["projects", "custom_roles", "memberships"])
-            return org
+            
+            # 4. CRITICAL: Re-fetch with the full nested relationship chain
+            # db.refresh often fails with nested async relationships. 
+            # A fresh select with selectinload is much more reliable.
+            final_result = await db.execute(
+                select(Organization)
+                .options(
+                    selectinload(Organization.projects),
+                    selectinload(Organization.custom_roles),
+                    # This chain is what fixes the "MissingGreenlet" error
+                    selectinload(Organization.memberships).selectinload(Membership.user) 
+                )
+                .where(Organization.id == org_id)
+            )
+            return final_result.scalar_one()
+
         except Exception as e:
             await db.rollback()
+            # Logging the error helps you debug if it's a slug conflict or DB error
+            print(f"Update failed: {e}")
             raise HTTPException(status_code=500, detail="Update failed")
-
     @staticmethod
     async def delete_organization(db: AsyncSession, org_id: str, current_user):
         # 1. RBAC Check
-        await OrganizationService._check_admin_access(db, org_id, str(current_user.id))
+        await OrganizationService.check_admin_access(db, org_id, str(current_user.id))
 
         result = await db.execute(select(Organization).where(Organization.id == org_id))
         org = result.scalar_one_or_none()
@@ -159,12 +218,16 @@ class OrganizationService:
     # Inside class OrganizationService:
 
     @staticmethod
-    async def get_org_by_id(db: AsyncSession, org_id: str) -> Organization:
+    async def get_org_by_id(db: AsyncSession, org_id: str, user: User) -> Organization:
+        # 1. Fetch the Organization with all relationships
         result = await db.execute(
             select(Organization)
             .options(
-                selectinload(Organization.projects),
-                selectinload(Organization.memberships).selectinload(Membership.user),
+                # Load projects AND their members so we can check permissions
+                selectinload(Organization.projects)
+                    .selectinload(Project.project_members),
+                selectinload(Organization.memberships)
+                    .selectinload(Membership.user),
                 selectinload(Organization.custom_roles)
             )
             .where(Organization.id == org_id)
@@ -173,10 +236,24 @@ class OrganizationService:
         
         if not org:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
+                status_code=404, 
                 detail="Organization not found"
             )
+
+        # 2. Identify the requester's role in this specific Org
+        user_membership = next((m for m in org.memberships if m.user_id == str(user.id)), None)
+        is_admin = user_membership and user_membership.role.lower() == "admin"
+
+        # 3. Apply the Privacy Filter to the projects list
+        if not is_admin:
+            # If Amir is a member, only keep projects where he is a project_member
+            org.projects = [
+                p for p in org.projects 
+                if any(pm.user_id == str(user.id) for pm in p.project_members)
+            ]
+            
         return org
+
 
     @staticmethod
     async def add_member_to_org(db: AsyncSession, org_id: str, email: str):

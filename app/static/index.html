@@ -81,7 +81,7 @@
             <div id="register-form" style="display:none">
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
-                    <input type="text" id="reg-name" class="form-input" placeholder="Jane Doe" />
+                    <input type="text" id="reg-name" class="form-input" placeholder="your name" />
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
@@ -150,7 +150,7 @@
                     </div>
 
                     <div class="card" style="margin-top: 20px;">
-                        <h3>Member Roles</h3>
+                        <h3>Roles</h3>
                         <div id="role-list-container">
                         </div>
                     </div>
@@ -245,12 +245,17 @@
                 </div>
 
                 <div class="actions-bar" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-                    <button class="btn-primary" onclick="openModal('project')" style="width: auto; padding: 10px 20px;">
+                    <button id="new-project-btn" class="btn-primary" onclick="openModal('project')"
+                        style="width: auto; padding: 10px 20px;">
                         + New Project
                     </button>
                 </div>
 
-                <div id="projects-grid" class="grid"></div>
+                <div id="projects-grid" class="grid">
+                    <div class="loader">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- TASKS VIEW -->
@@ -263,59 +268,60 @@
                     </button>
 
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
+                        <div style="flex: 1;">
                             <h2 id="view-project-detail-title" style="margin: 0; font-size: 1.8rem;">Project Name</h2>
                             <p id="view-project-detail-desc" class="text-dim"
-                                style="color: #9ca3af; margin-top: 5px; font-size: 0.95rem;"></p>
+                                style="color: #9ca3af; margin-top: 5px; font-size: 0.95rem; max-width: 600px;"></p>
+
+                            <div id="project-members-list" style="margin-top: 10px; display: flex; gap: 5px;"></div>
                         </div>
-                        <div class="invite-section"
-                            style="margin-top: 2rem; padding: 1rem; background: #1f2937; border-radius: 12px;">
-                            <h4 style="color: white; margin-bottom: 1rem;">Invite Collaborator</h4>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="text" id="user-search-input" placeholder="Search by username or email..."
-                                    style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: white;">
-                                <button onclick="searchUsers()" class="btn-primary">Search</button>
-                            </div>
-                            <div id="search-results"
-                                style="margin-top: 1rem; display: flex; flex-direction: column; gap: 8px;"></div>
+
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button class="btn-sm btn-edit" id="add-project-member-btn"
+                                onclick="openAddProjectMemberModal(state.currentProjectId)"
+                                style="display: flex; align-items: center; gap: 8px; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                                <i class="fas fa-user-plus"></i> Add Member
+                            </button>
+
+                            <button type="button" onclick="openTaskModal('Pending')"
+                                style="background-color: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.2s;">
+                                <i class="fas fa-plus"></i> Add Task
+                            </button>
                         </div>
-                        <button type="button" onclick="openTaskModal('Pending')"
-                            style="background-color: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.2s;">
-                            <i class="fas fa-plus"></i> Add Task
-                        </button>
                     </div>
                 </div>
 
                 <div class="kanban-board" style="display: flex; gap: 20px; margin-top: 30px; align-items: flex-start;">
-
                     <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Pending')"
                         style="background-color: #080c15; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #131924;">
                         <div class="column-header">
                             <h3 style="margin: 0; font-size: 1.1rem; color: #e5e7eb;">Pending</h3>
                         </div>
                         <div id="tasks-Pending" class="task-list"
-                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px;"></div>
+                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px; margin-top:15px;">
+                        </div>
                     </div>
 
                     <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'In-Progress')"
-                        style="background-color: #1f2937; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #374151;">
+                        style="background-color: #111827; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #1f2937;">
                         <div class="column-header">
                             <h3 style="margin: 0; font-size: 1.1rem; color: #e5e7eb;">In Progress</h3>
                         </div>
                         <div id="tasks-In-Progress" class="task-list"
-                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px;"></div>
+                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px; margin-top:15px;">
+                        </div>
                     </div>
 
                     <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Completed')"
-                        style="background-color: #1f2937; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #374151;">
+                        style="background-color: #111827; border-radius: 12px; min-width: 300px; flex: 1; padding: 15px; border: 1px solid #1f2937;">
                         <div class="column-header">
                             <h3 style="margin: 0; font-size: 1.1rem; color: #e5e7eb;">Completed</h3>
                         </div>
                         <div id="tasks-Completed" class="task-list"
-                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px;"></div>
+                            style="min-height: 100px; display: flex; flex-direction: column; gap: 12px; margin-top:15px;">
+                        </div>
                     </div>
                 </div>
-
             </div>
 
             <div id="view-tasks" class="view">

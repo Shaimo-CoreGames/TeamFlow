@@ -38,6 +38,9 @@ class OrgRead(OrgBase):
     memberships: List[MembershipRead] = []
     
     model_config = ConfigDict(from_attributes=True)
+    @property
+    def member_count(self) -> int:
+        return len(self.memberships)
 class OrgMemberAdd(BaseModel):
     user_id: str
     role: str = "Member"  # Default matches your seed
