@@ -1031,69 +1031,83 @@ if (inviteRoleSelect && org.custom_roles) {
         // PROJECTS
         // ===================================================
         function renderProjects() {
-    const grid = document.getElementById('projects-grid');
-    if (!grid) return;
+            const grid = document.getElementById('projects-grid');
+            if (!grid) return;
 
-    const projects = state.projects || [];
+            const projects = state.projects || [];
 
-    if (projects.length === 0) {
-        grid.innerHTML = `<div class="empty-state">No projects found in this organization.</div>`;
-        return;
-    }
+            if (projects.length === 0) {
+                grid.innerHTML = `<div class="empty-state">No projects found in this organization.</div>`;
+                return;
+            }
 
-    // 1. Determine if current user is an Org Admin to show/hide action buttons
-    const myMembership = state.currentOrg?.memberships?.find(m => m.user_id === state.user.id);
-    const isAdmin = myMembership?.role?.toLowerCase().includes('admin');
+            // 1. Determine if current user is an Org Admin to show/hide action buttons
+            const myMembership = state.currentOrg?.memberships?.find(m => m.user_id === state.user.id);
+            const isAdmin = myMembership?.role?.toLowerCase().includes('admin');
 
-    grid.innerHTML = projects.map(p => {
-        const dateObj = p.created_at ? new Date(p.created_at) : null;
-        const dateStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleDateString() : "Pending...";
+            grid.innerHTML = projects.map(p => {
+                const dateObj = p.created_at ? new Date(p.created_at) : null;
+                const dateStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleDateString() : "Pending...";
 
-        // Inside projects.map loop in renderProjects()
-        const members = p.project_members || [];
-        const membersHtml = members.map(pm => {
-            // Note the path: pm (ProjectMember) -> user -> name
-            const name = pm.user?.name || "Unknown";
-            const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-            return `<div class="member-pill" title="${name}">${initials}</div>`;
-        }).join('');
-
-        return `
-            <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer; position: relative;">
-                <div class="card-title">
-                    ${p.name}
-                    <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
-                </div>
-                
-                <div class="card-meta">
-                    <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.4;">
-                        ${p.description || "No description."}
-                    </p>
+                // 2. Map through members to show First Name instead of Initials
+                const members = p.project_members || [];
+                const membersHtml = members.map(pm => {
+                    const name = pm.user?.name || "Unknown";
                     
-                    <div style="margin: 12px 0;">
-                        <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px;">Project Team</div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                            ${membersHtml || '<span style="font-size: 11px; color: #4b5563; font-style: italic;">No members assigned</span>'}
+                    // Extract first name (e.g., "Amir Khan" -> "Amir")
+                    const firstName = name.split(' ')[0]; 
+
+                    return `
+                        <div class="member-tag" 
+                            title="${name}" 
+                            style="background: rgba(99, 102, 241, 0.15); 
+                                    color: #a5b4fc; 
+                                    padding: 2px 8px; 
+                                    border-radius: 4px; 
+                                    font-size: 11px; 
+                                    border: 1px solid rgba(99, 102, 241, 0.3);
+                                    white-space: nowrap;
+                                    display: inline-block;">
+                            ${firstName}
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div class="card" onclick="openProjectDetail('${p.id}')" style="cursor:pointer; position: relative;">
+                        <div class="card-title">
+                            ${p.name}
+                            <span style="font-size: 10px; color: var(--text-dim);">#${p.id.substring(0, 8)}</span>
                         </div>
-                    </div>
+                        
+                        <div class="card-meta">
+                            <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.4;">
+                                ${p.description || "No description."}
+                            </p>
+                            
+                            <div style="margin: 12px 0;">
+                                <div style="font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px;">Project Team</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    ${membersHtml || '<span style="font-size: 11px; color: #4b5563; font-style: italic;">No members assigned</span>'}
+                                </div>
+                            </div>
 
-                    <span style="font-size: 11px; opacity: 0.8;">Created: <strong>${dateStr}</strong></span>
-                </div>
+                            <span style="font-size: 11px; opacity: 0.8;">Created: <strong>${dateStr}</strong></span>
+                        </div>
 
-                ${isAdmin ? `
-                    <div class="card-actions" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #374151;">
-                        <button class="btn-sm btn-edit" onclick="event.stopPropagation(); openEditProject('${p.id}')">Edit</button>
-                        <button class="btn-sm btn-danger" 
-                                style="background: #dc354522; color: #ef4444; border: 1px solid #ef444444; margin-left: 5px;" 
-                                onclick="event.stopPropagation(); deleteProject('${p.id}', '${p.name.replace(/'/g, "\\'")}')">
-                            Delete
-                        </button>
+                        ${isAdmin ? `
+                            <div class="card-actions" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #374151;">
+                                <button class="btn-sm btn-edit" onclick="event.stopPropagation(); openEditProject('${p.id}')">Edit</button>
+                                <button class="btn-sm btn-danger" 
+                                        style="background: #dc354522; color: #ef4444; border: 1px solid #ef444444; margin-left: 5px;" 
+                                        onclick="event.stopPropagation(); deleteProject('${p.id}', '${p.name.replace(/'/g, "\\'")}')">
+                                    Delete
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
-                ` : ''}
-            </div>
-        `;
-    }).join('');
-}
+                `;
+            }).join('');
+        }
 
         async function loadProjects(orgId) {
     try {
@@ -1107,11 +1121,7 @@ if (inviteRoleSelect && org.custom_roles) {
             state.currentOrg = orgData;
             state.currentOrgId = orgId;
         }
-
-        // 3. Now pull the projects from the freshly loaded Org
-        // These will have the project_members included because of our backend fix
         state.projects = state.currentOrg.projects || [];
-
         // 4. Update UI
         renderProjects();
         
