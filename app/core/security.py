@@ -1,14 +1,11 @@
 from datetime import datetime, timedelta
-from typing import Optional
 
 import bcrypt
 from jose import jwt, JWTError
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
 from app.models.user import User
-from app.schemas.user_schema import UserCreate, UserLogin, TokenResponse
 from app.core.config import settings
 
 

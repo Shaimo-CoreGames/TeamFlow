@@ -1,5 +1,4 @@
 from pydantic import BaseModel, ConfigDict, Field
-from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
 from app.schemas.project_schema import ProjectResponse

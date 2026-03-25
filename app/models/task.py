@@ -6,20 +6,14 @@ from app.database import Base
 
 class Task(Base):
     __tablename__ = "tasks"
-
-    # ID using UUID string to match your frontend logic
     id: Mapped[str] = mapped_column(
         String(36), 
         primary_key=True, 
         index=True, 
         default=lambda: str(uuid.uuid4())
     )
-
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    
-    # --- ADDED MISSING COLUMNS START ---
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    
     priority: Mapped[str] = mapped_column(
         String(50), 
         default="Medium", 
@@ -39,8 +33,6 @@ class Task(Base):
         default=datetime.utcnow, 
         server_default="now()"
     )
-    # --- ADDED MISSING COLUMNS END ---
-
     # Foreign Keys
     project_id: Mapped[str] = mapped_column(
         String(36), 
@@ -57,4 +49,4 @@ class Task(Base):
     # Relationships
     project = relationship("Project", back_populates="tasks")
     assignee = relationship("User", back_populates="tasks_assigned")
-    comments = relationship("Comment", back_populates="task", cascade="all, delete")
+    comments = relationship("Comment", back_populates="task", cascade="all, delete-orphan")

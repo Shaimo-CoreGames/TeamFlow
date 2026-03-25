@@ -1036,3 +1036,35 @@ select.input-field option {
     background: #1f2937;
     color: white;
 }
+
+/* --------------------------------------------------------------------- */
+#task-comments-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#task-comments-list::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 10px;
+}
+
+.comment-card {
+    transition: transform 0.2s ease;
+}
+
+.comment-card:hover {
+    border-color: #4f46e5 !important;
+}
+
+
+/* ------------------------------------------------------------ */
+.task-card-pro:hover {
+    transform: translateY(-4px);
+    border-color: #4f46e5 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    background: #1c2533 !important;
+}
+
+#dash-tasks::-webkit-scrollbar {
+    display: none;
+    /* Keeps the dashboard clean */
+}

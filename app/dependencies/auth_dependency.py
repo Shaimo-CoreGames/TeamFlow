@@ -3,7 +3,6 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import JWTError, jwt
-import uuid
 from app.database import get_db
 from app.models.user import User
 from app.core.config import settings  # where SECRET_KEY, ALGORITHM live

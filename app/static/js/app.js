@@ -382,8 +382,9 @@
     }
 
     // 4. Trigger Renders
-    if (name === 'dashboard') renderDashboard();
-    if (name === 'orgs') renderOrgs();
+if (name === 'dashboard') { renderDashboard();
+    loadDashboardTasks(); // ADD THIS LINE HERE
+}
     if (name === 'projects') renderProjects();
     if (name === 'tasks') renderTasks();
     if (name === 'members') renderMembers();
@@ -1286,6 +1287,10 @@ if (inviteRoleSelect && org.custom_roles) {
         if (tasksGrid) tasksGrid.innerHTML = '';
         showToast("Error loading tasks.", "error");
     }
+    state.currentProjectId = projectId; // Update the state
+    
+    // THIS IS THE KEY: Call the load function here!
+    loadProjectComments(projectId);
 }
 
         function openAddProjectMemberModal(projectId) {
@@ -1470,6 +1475,147 @@ if (inviteRoleSelect && org.custom_roles) {
                 document.getElementById('search-results').innerHTML = ''; // Clear results
             } catch (err) {
                 showToast("Already invited or error occurred", "error");
+            }
+        }
+
+        function openCommentModal(taskId) {
+            document.getElementById('comment-task-id').value = taskId;
+            document.getElementById('comment-content').value = '';
+            document.getElementById('modal-comment').classList.add('open');
+        }
+
+        async function submitComment() {
+            const input = document.getElementById('new-comment-input');
+            const content = input.value.trim();
+            
+            // Check if we have content and a valid Project ID
+            if (!content || !state.currentProjectId) return;
+
+            try {
+                const url = state.currentTaskId 
+                    ? `/tasks/${state.currentTaskId}/comments` 
+                    : `/projects/${state.currentProjectId}/comments`;
+
+                // 1. POST the comment using the correct function name: api()
+                await api('POST', url, { content });
+
+                // 2. Clear the input box
+                input.value = '';
+
+                // 3. Refresh the list immediately
+                await loadProjectComments(state.currentProjectId);
+
+            } catch (err) {
+                console.error("Submit Error:", err);
+            }
+        }
+
+        // Function for General Project Discussion
+       
+
+                // Add this to handle the "Enter" key
+        function handleCommentKey(event) {
+            if (event.key === "Enter") {
+                submitComment();
+            }
+        }
+
+        function renderComments(comments) {
+    const container = document.getElementById('task-comments-list');
+    if (!container) return;
+
+    container.innerHTML = ''; 
+
+    if (!comments || comments.length === 0) {
+        container.innerHTML = '<div class="text-dim" style="text-align:center; padding:20px;">No messages yet.</div>';
+        return;
+    }
+
+    const sorted = [...comments].reverse();
+
+    container.innerHTML = sorted.map(c => {
+        const name = c.user?.name || "Member";
+        const time = new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // CHECK: Is this comment mine? 
+        // Ensure state.user.id is set when you log in!
+        const isMyComment = c.user_id === state.user?.id;
+
+        return `
+            <div class="comment-card" style="background: #1f2937; border-radius: 8px; padding: 12px; border: 1px solid #374151; margin-bottom: 10px; position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="font-weight: 600; color: #818cf8; font-size: 13px;">${name}</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 11px; color: #9ca3af;">${time}</span>
+                        ${isMyComment ? `
+                            <button onclick="deleteComment('${c.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size: 12px;" title="Delete Message">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div style="font-size: 14px; color: #e5e7eb;">${c.content}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteComment(commentId) {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+
+    try {
+        // Correctly using your api() helper
+        await api('DELETE', `/comments/${commentId}`);
+        
+        // Refresh the list immediately
+        if (state.currentTaskId) {
+            await loadTaskComments(state.currentTaskId);
+        } else {
+            await loadProjectComments(state.currentProjectId);
+        }
+    } catch (err) {
+        console.error("Delete failed:", err);
+        alert("You can only delete your own comments.");
+    }
+}
+
+        // 1. Function to refresh manually
+        // 1. Define the Refresh Function
+        async function refreshDiscussion() {
+            console.log("Refreshing discussion...");
+            const icon = document.getElementById('refresh-icon');
+            
+            // Start spinning animation
+            if (icon) icon.classList.add('fa-spin');
+
+            try {
+                if (state.currentProjectId) {
+                    // Re-use your existing load function
+                    await loadProjectComments(state.currentProjectId);
+                } else {
+                    console.warn("No active project ID found in state.");
+                }
+            } catch (err) {
+                console.error("Refresh failed:", err);
+            } finally {
+                // Stop spinning after a brief delay
+                if (icon) {
+                    setTimeout(() => icon.classList.remove('fa-spin'), 600);
+                }
+            }
+        }
+
+        // 2. Modified Load function (used both for Auto-load and Refresh)
+        async function loadProjectComments(projectId) {
+            const container = document.getElementById('task-comments-list');
+            if (!container) return;
+
+            try {
+                const comments = await api('GET', `/projects/${projectId}/comments`);
+                renderComments(comments); // Use your existing renderComments function
+            } catch (err) {
+                console.error("Failed to load discussion:", err);
+                container.innerHTML = '<div style="color:#ef4444; text-align:center;">Could not load messages.</div>';
             }
         }
 
@@ -1776,29 +1922,6 @@ if (inviteRoleSelect && org.custom_roles) {
             }
         }
 
-
-        // ===================================================
-        // COMMENTS
-        // ===================================================
-        function openCommentModal(taskId) {
-            document.getElementById('comment-task-id').value = taskId;
-            document.getElementById('comment-content').value = '';
-            document.getElementById('modal-comment').classList.add('open');
-        }
-
-        async function saveComment() {
-            const task_id = parseInt(document.getElementById('comment-task-id').value);
-            const content = document.getElementById('comment-content').value.trim();
-            if (!content) return showModalError('comment', 'Content is required');
-            try {
-                await api('POST', '/comments/', { task_id, content });
-                closeModal('comment');
-                showToast('Comment posted!');
-            } catch (e) {
-                showModalError('comment', e.message);
-            }
-        }
-
         // ===================================================
         // MEMBERS
         // ===================================================
@@ -1904,6 +2027,47 @@ if (inviteRoleSelect && org.custom_roles) {
                     `).join('')}
                 </div>`;
         }
+        async function loadDashboardTasks() {
+    const container = document.getElementById('dash-tasks');
+    if (!container) return;
+
+    try {
+        const tasks = await api('GET', '/tasks/recent'); 
+        
+        if (!tasks || tasks.length === 0) {
+            container.innerHTML = `<div style="color: #9ca3af; padding: 10px;">No recent tasks.</div>`;
+            return;
+        }
+
+        // Professional Grid Layout
+        container.style.display = "grid";
+        container.style.gridTemplateColumns = "repeat(auto-fill, minmax(280px, 1fr))";
+        container.style.gap = "16px";
+
+        container.innerHTML = tasks.map(task => {
+            const statusColor = task.status === 'Completed' ? '#10b981' : '#3b82f6';
+            const priorityColor = task.priority === 'High' ? '#ef4444' : '#f59e0b';
+
+            return `
+                <div class="task-card-pro" 
+                     style="background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; transition: 0.2s;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="background: ${statusColor}22; color: ${statusColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
+                            ${task.status}
+                        </span>
+                        <span style="background: ${priorityColor}22; color: ${priorityColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">
+                            ${task.priority}
+                        </span>
+                    </div>
+                    <h4 style="margin: 0 0 4px 0; color: #fff; font-size: 15px;">${task.title}</h4>
+                    <p style="margin: 0; color: #9ca3af; font-size: 12px; line-height: 1.4;">${task.description || ''}</p>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("Dashboard load failed:", err);
+    }
+}
 
         function updateStats() {
             document.getElementById('stat-orgs').textContent = state.orgs.length;

@@ -99,7 +99,7 @@
     <!-- ======== APP ======== -->
     <div id="app" style="display:none; flex-direction:column;">
 
-        <!-- TOP NAV -->
+        <!-- TOP NAV -->y
         <nav class="topnav">
             <div class="topnav-logo">TeamFlow</div>
             <div class="topnav-nav">
@@ -176,7 +176,6 @@
                             Invite
                         </button>
                     </div>
-
                     <div id="invite-message" style="margin-top: 10px; font-size: 0.85rem;"></div>
                 </div>
 
@@ -212,16 +211,12 @@
                         <div class="stat-value" id="stat-done">—</div>
                     </div>
                 </div>
-                <div id="invites-section" style="display: none; margin-bottom: 24px;">
-                    <div class="page-title" style="font-size:18px; margin-bottom:12px; color: #818cf8;">
-                        Pending Project Invitations
-                    </div>
-                    <div id="invites-list"
-                        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
-                    </div>
+                <div class="page-title" style="font-size: 20px; margin-bottom: 16px; font-weight: 700; color: #f3f4f6;">
+                    Recent Tasks
                 </div>
-                <div class="page-title" style="font-size:20px;margin-bottom:16px;">Recent Tasks</div>
-                <div id="dash-tasks"></div>
+                <div id="dash-tasks"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                </div>
             </div>
 
             <!-- ORGS VIEW -->
@@ -322,43 +317,42 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="project-discussion"
+                    style="margin-top: 40px; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 20px;">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #1f2937; padding-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-comments" style="color: #818cf8;"></i>
+                            <h3 style="margin: 0; font-size: 1.2rem; color: white;">Project Discussion</h3>
+                        </div>
+                        <button onclick="refreshDiscussion()"
+                            style="background: none; border: none; color: #9ca3af; cursor: pointer; transition: 0.2s;"
+                            onmouseover="this.style.color='#818cf8'" onmouseout="this.style.color='#9ca3af'">
+                            <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                        </button>
+                    </div>
+
+                    <div class="comment-input-area"
+                        style="display: flex; gap: 12px; background: #080c15; padding: 15px; border-radius: 8px; border: 1px solid #1f2937; margin-bottom: 20px;">
+                        <input type="text" id="new-comment-input" placeholder="Type a message to the team..."
+                            onkeyup="handleCommentKey(event)"
+                            style="flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 0.95rem;">
+                        <button onclick="submitComment()"
+                            style="background: #4f46e5; border: none; color: white; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Send <i class="fas fa-paper-plane" style="margin-left: 5px; font-size: 0.8rem;"></i>
+                        </button>
+                    </div>
+
+                    <div id="task-comments-list"
+                        style="max-height: 500px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 10px;">
+                    </div>
+                </div>
             </div>
 
             <div id="view-tasks" class="view">
                 <div class="page-header">
                     <div class="page-title" id="project-detail-name">Project Tasks</div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start;">
-                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Pending')"
-                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="font-size: 14px; color: #9ca3af;">PENDING</h3>
-                            <button onclick="openTaskModal('Pending')"
-                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
-                        </div>
-                        <div id="tasks-pending" style="display: flex; flex-direction: column; gap: 12px;"></div>
-                    </div>
-
-                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'In-Progress')"
-                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="font-size: 14px; color: #818cf8;">IN PROGRESS</h3>
-                            <button onclick="openTaskModal('In-Progress')"
-                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
-                        </div>
-                        <div id="tasks-progress" style="display: flex; flex-direction: column; gap: 12px;"></div>
-                    </div>
-
-                    <div class="kanban-column" ondragover="allowDrop(event)" ondrop="handleDrop(event, 'Completed')"
-                        style="background: #111827; border-radius: 12px; padding: 16px; min-height: 500px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="font-size: 14px; color: #43e97b;">COMPLETED</h3>
-                            <button onclick="openTaskModal('Completed')"
-                                style="background:none; border:none; color:var(--accent); cursor:pointer;">+</button>
-                        </div>
-                        <div id="tasks-completed" style="display: flex; flex-direction: column; gap: 12px;"></div>
-                    </div>
                 </div>
             </div>
 

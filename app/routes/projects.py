@@ -20,7 +20,6 @@ router = APIRouter(
     tags=["Projects"],
 )
 
-
 @router.post("/organizations/{org_id}/projects", response_model=ProjectResponse)
 async def create_project(
     org_id: str, 
@@ -34,7 +33,6 @@ async def create_project(
     )
     
     return new_project
-
 
 @router.put("/projects/{project_id}", response_model=ProjectResponse)
 async def update_project(
@@ -50,7 +48,6 @@ async def update_project(
         user=current_user,
     )
 
-
 @router.delete(
     "/projects/{project_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -65,8 +62,6 @@ async def delete_project(
         project_id=project_id,
         user=current_user,
     )
-
-# app/routes/projects.py
 
 @router.get("/organizations/{org_id}/projects", response_model=List[ProjectResponse])
 async def list_projects(
@@ -95,13 +90,11 @@ async def add_project_member(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # 2. Find the target user by email
     user_result = await db.execute(select(User).where(User.email == email))
     target_user = user_result.scalar_one_or_none()
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found in system")
 
-    # 3. VERIFY: Is this user a member of the project's Organization?
     org_member_check = await db.execute(
         select(Membership).where(
             Membership.organization_id == project.organization_id,

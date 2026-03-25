@@ -1,10 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from app.core.config import settings
 from app.database import engine, Base
-from app import models
-
-
 from fastapi.staticfiles import StaticFiles
 
 
@@ -18,19 +14,11 @@ from app.routes import (
     comments,
     memberships,
 )
-# -------------------------------------------------
-# Create FastAPI instance
-# -------------------------------------------------
-
 app = FastAPI(
     title="TeamFlow API",
     version="1.0.0",
     description="Multi-tenant Project Management SaaS Backend",
 )
-
-# -------------------------------------------------
-# Include Routers
-# -------------------------------------------------
 
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -38,12 +26,7 @@ app.include_router(organizations.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(comments.router)
-app.include_router(memberships.router)
-
-
-# -------------------------------------------------
-# Root / Health Check Route
-# -------------------------------------------------
+# app.include_router(memberships.router)
 
 @app.get("/")
 async def read_index():
@@ -51,18 +34,15 @@ async def read_index():
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# -------------------------------------------------
-# Startup Event
-# -------------------------------------------------
-
 @app.on_event("startup")
 async def on_startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-# -------------------------------------------------
-# Shutdown Event (Optional)
-# -------------------------------------------------
+    try:
+        async with engine.begin() as conn:
+            # Check if we can actually connect
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Database tables synced successfully.")
+    except Exception as e:
+        print(f"❌ Database startup error: {e}")
 
 @app.on_event("shutdown")
 async def shutdown():

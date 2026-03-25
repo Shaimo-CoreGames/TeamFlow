@@ -17,10 +17,6 @@ class ProjectService:
         project_data: ProjectCreate,
         user: User,
     ) -> Project:
-        """
-        CREATION LOGIC:
-        Creates project and adds the Admin as the first member.
-        """
         # 1. Create the Project
         project = Project(
             id=str(uuid.uuid4()),
@@ -30,24 +26,30 @@ class ProjectService:
             created_by=str(user.id),
         )
         db.add(project)
-        
-        # 2. Flush to ensure project.id is available
         await db.flush() 
 
-        # 3. Add the creator (Shah Meer) to the project team
-        # Note: Since Shah Meer is Admin, he'd see it anyway, but 
-        # this ensures his initials show up in the "Project Team" list.
+        # 2. Add the creator as the first member
         new_member = ProjectMember(
             id=str(uuid.uuid4()),
             project_id=project.id,
             user_id=str(user.id),
-            role="admin" # The creator is the project admin
+            role="admin"
         )
         db.add(new_member)
 
         await db.commit()
-        await db.refresh(project) 
-        return project
+        
+        # --- FIX STARTS HERE ---
+        # Re-fetch the project with members loaded to satisfy the Response Schema
+        result = await db.execute(
+            select(Project)
+            .where(Project.id == project.id)
+            .options(
+                selectinload(Project.project_members)
+                .selectinload(ProjectMember.user)
+            )
+        )
+        return result.scalars().one()
     
     @staticmethod
     async def update_project(db: AsyncSession, project_id: uuid.UUID, project_data: ProjectUpdate, user: User) -> Project:

@@ -1,43 +1,34 @@
-from datetime import datetime
 import uuid
-from sqlalchemy import Column, ForeignKey, DateTime, Text, String
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from datetime import datetime
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import relationship, backref
 from app.database import Base
 
 class Comment(Base):
     __tablename__ = "comments"
 
-    # Use UUID for consistency with your other models
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # --- CRITICAL CHANGES HERE ---
+    # 1. Make task_id optional so project-level comments can exist
+    task_id = Column(String(36), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True)
+    
+    # 2. Add project_id so we know which project the general chat belongs to
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    # -----------------------------
 
-    # Use UUID for the task reference if your Tasks use UUIDs
-    task_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), 
-        ForeignKey("tasks.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    # CONSOLIDATED: Only one reference to the User table
-    author_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), 
-        ForeignKey("users.id", ondelete="CASCADE"), 
-        nullable=False
-    )
-
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
-    )
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    parent_id = Column(String(36), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
 
     # Relationships
     task = relationship("Task", back_populates="comments")
+    project = relationship("Project") # Add this to link to Project model
+    user = relationship("User", back_populates="comments")
     
-    # This "author" relationship now points clearly to the author_id column
-    author = relationship("User", back_populates="comments")
+    replies = relationship(
+        "Comment", 
+        backref=backref('parent', remote_side=[id]),
+        cascade="all, delete-orphan"
+    )

@@ -1,5 +1,4 @@
 import uuid
-import enum
 from sqlalchemy import Column, String, ForeignKey, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, mapped_column, relationship
 from sqlalchemy.sql import func

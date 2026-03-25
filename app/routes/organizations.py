@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database import get_db
 from app.models.org_role import OrganizationRole
-from app.models.organization import Organization
 from app.schemas.organization_schema import OrgRead, OrganizationCreate
 from app.services.organization_service import OrganizationService
 from app.dependencies.auth_dependency import get_current_user
