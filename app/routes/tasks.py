@@ -1,5 +1,3 @@
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -12,6 +10,10 @@ from app.schemas.task_schema import (
 from app.services.task_service import TaskService
 from app.dependencies.auth_dependency import get_current_user
 from app.models.user import User
+from sqlalchemy import select
+from app.models.task import Task
+from sqlalchemy.orm import joinedload # Import this!
+
 
 router = APIRouter(
     tags=["Tasks"],
@@ -97,20 +99,15 @@ async def update_task_status(
         
     return task
 
-# In app/routes/tasks.py
-
-@router.get("/tasks/recent")
+@router.get("/tasks/recent", response_model=list[TaskResponse]) # Use the updated schema
 async def get_recent_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from sqlalchemy import select
-    from app.models.task import Task
-
     result = await db.execute(
         select(Task)
-        # CHANGE 'assignee_id' TO 'assigned_to' (or whatever matches your model)
-        .where(Task.assigned_to == current_user.id) 
+        .options(joinedload(Task.assignee)) # 👈 This joins the User table
+        .where(Task.assigned_to == str(current_user.id)) 
         .order_by(Task.created_at.desc())
         .limit(5)
     )

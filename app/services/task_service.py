@@ -1,13 +1,12 @@
 import uuid
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload # CRITICAL IMPORT
 from fastapi import HTTPException
 
 from app.models.task import Task
 from app.schemas.task_schema import TaskCreate, TaskUpdate
 from app.models.user import User
-
 
 class TaskService:
 
@@ -17,12 +16,13 @@ class TaskService:
         task_data: TaskCreate,
         user: User,
     ) -> Task:
+        assignee_id = task_data.assigned_to if task_data.assigned_to else str(user.id)
 
         task = Task(
             title=task_data.title,
             description=task_data.description,
             project_id=task_data.project_id,
-            assigned_to=task_data.assigned_to,
+            assigned_to=assignee_id,
             priority=task_data.priority,
             status=task_data.status,
             due_date=task_data.due_date,
@@ -30,9 +30,14 @@ class TaskService:
 
         db.add(task)
         await db.commit()
-        await db.refresh(task)
-
-        return task
+        
+        # After commit, fetch the task AGAIN with the assignee loaded
+        result = await db.execute(
+            select(Task)
+            .options(joinedload(Task.assignee))
+            .where(Task.id == task.id)
+        )
+        return result.scalar_one()
 
     @staticmethod
     async def update_task(
@@ -41,9 +46,11 @@ class TaskService:
         task_data: TaskUpdate,
         user: User,
     ) -> Task:
-
+        # Load assignee here so the response model doesn't crash
         result = await db.execute(
-            select(Task).where(Task.id == task_id)
+            select(Task)
+            .options(joinedload(Task.assignee))
+            .where(Task.id == str(task_id))
         )
         task = result.scalar_one_or_none()
 
@@ -54,8 +61,33 @@ class TaskService:
             setattr(task, field, value)
 
         await db.commit()
-        await db.refresh(task)
+        await db.refresh(task, ["assignee"]) # Ensure relationship is still there
+        return task
 
+    @staticmethod
+    async def get_tasks_by_project(db: AsyncSession, project_id: str):
+        # This was the cause of your 500 error!
+        result = await db.execute(
+            select(Task)
+            .options(joinedload(Task.assignee)) # 👈 Add this
+            .where(Task.project_id == str(project_id))
+            .order_by(Task.created_at.desc())
+        )
+        return result.scalars().all()
+    
+    @staticmethod
+    async def update_task_status(db: AsyncSession, task_id: str, status: str):
+        result = await db.execute(
+            select(Task)
+            .options(joinedload(Task.assignee)) # 👈 Add this
+            .where(Task.id == str(task_id))
+        )
+        task = result.scalar_one_or_none()
+        
+        if task:
+            task.status = status
+            await db.commit()
+            await db.refresh(task, ["assignee"])
         return task
 
     @staticmethod
@@ -65,7 +97,7 @@ class TaskService:
         user: User,
     ):
         result = await db.execute(
-            select(Task).where(Task.id == task_id)
+            select(Task).where(Task.id == str(task_id))
         )
         task = result.scalar_one_or_none()
 
@@ -74,25 +106,3 @@ class TaskService:
 
         await db.delete(task)
         await db.commit()
-        # app/services/task_service.py
-
-
-    @staticmethod
-    async def get_tasks_by_project(db: AsyncSession, project_id: str):
-        # Ensure project_id is handled as a string for SQLite compatibility
-        result = await db.execute(
-            select(Task).where(Task.project_id == str(project_id))
-        )
-        return result.scalars().all()
-    
-    @staticmethod
-    async def update_task_status(db: AsyncSession, task_id: str, status: str):
-        # Use str(task_id) if there is any chance it's being passed as a UUID object
-        result = await db.execute(select(Task).where(Task.id == str(task_id)))
-        task = result.scalar_one_or_none()
-        
-        if task:
-            task.status = status
-            await db.commit()
-            await db.refresh(task)
-        return task

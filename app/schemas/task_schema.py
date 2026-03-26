@@ -41,10 +41,20 @@ class TaskUpdate(BaseModel):
 # Response
 # ==============================
 
+# Add this above TaskResponse
+class UserMin(BaseModel):
+    id: str
+    name: str  # Or 'name' - check your User model field!
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Update TaskResponse
 class TaskResponse(TaskBase):
     id: str
     project_id: str
     assigned_to: Optional[str] = None
+    # --- ADD THIS LINE ---
+    assignee: Optional[UserMin] = None 
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

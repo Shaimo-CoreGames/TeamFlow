@@ -894,24 +894,33 @@ if (inviteRoleSelect && org.custom_roles) {
 
 
         function closeModal(type) {
-            const modal = document.getElementById(`modal-${type}`);
-            if (modal) {
-                // Remove 'active' or 'open' classes
-                modal.classList.remove('active');
-                modal.classList.remove('open');
-            }
+    console.log(`Closing modal: ${type}`);
+    
+    // 1. Target the specific overlay
+    const modalOverlay = document.getElementById(`modal-${type}`);
+    if (modalOverlay) {
+        modalOverlay.style.display = 'none';
+        modalOverlay.classList.remove('active', 'open');
+    }
 
-            // Crucial: Clear the edit ID so the modal resets for next time
-            const editIdEl = document.getElementById('org-edit-id');
-            if (editIdEl) editIdEl.value = "";
+    // 2. NUCLEAR: Remove ANY element that looks like a backdrop or overlay
+    // This fixes the "frozen screen" issue by deleting the invisible walls
+    const genericOverlays = document.querySelectorAll('.modal-overlay, .modal-backdrop, .overlay');
+    genericOverlays.forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active', 'open');
+    });
 
-            // Clear error messages
-            const errorEl = document.getElementById(`${type}-error`);
-            if (errorEl) {
-                errorEl.style.display = 'none';
-                errorEl.textContent = "";
-            }
-        }
+    // 3. Unfreeze the body
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = 'auto';
+    document.body.style.pointerEvents = 'auto'; // Force clicks back on
+
+    // 4. Reset data
+    const editIdEl = document.getElementById(`${type}-edit-id`);
+    if (editIdEl) editIdEl.value = "";
+}
+
         function populateOrgSelect(selectId) {
             const sel = document.getElementById(selectId);
             sel.innerHTML = state.orgs.map(o => `<option value="${o.id}">${escHtml(o.name)}</option>`).join('') || '<option value="">No organizations</option>';
@@ -1028,6 +1037,7 @@ if (inviteRoleSelect && org.custom_roles) {
                 errorEl.style.display = 'block';
             }
         }
+
         // ===================================================
         // PROJECTS
         // ===================================================
@@ -2059,9 +2069,9 @@ async function deleteComment(commentId) {
 
                     <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #1f2937; display: flex; align-items: center; justify-content: space-between; color: #6b7280; font-size: 11px;">
                          <span><i class="far fa-calendar-alt"></i> ${new Date(t.created_at).toLocaleDateString()}</span>
-                         <div style="width: 24px; height: 24px; background: #4f46e5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold;">
-                            ${t.assignee_name ? t.assignee_name.charAt(0) : 'U'}
-                         </div>
+                         <div style="width: auto; min-width: 24px; height: 24px; background: #4f46e5; border-radius: 12px; padding: 0 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold;">
+                        ${t.assignee?.name ? t.assignee.name.split(' ')[0] : 'Amir'}
+                    </div>
                     </div>
                 </div>
             `;
