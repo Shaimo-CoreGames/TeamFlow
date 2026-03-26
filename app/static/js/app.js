@@ -1991,90 +1991,100 @@ async function deleteComment(commentId) {
         // DASHBOARD
         // ===================================================
         async function renderDashboard() {
-            // 1. Update stats and load invitations first
-            updateStats();
-            await checkInvitations(); // This ensures invites show up regardless of task count
-
-            // 2. Recent tasks logic
-            const el = document.getElementById('dash-tasks');
-            
-            // Safety check for state.tasks
-            const tasks = state.tasks || [];
-            const recent = [...tasks].slice(-5).reverse();
-
-            if (!recent.length) {
-                el.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">✅</div>
-                        <div class="empty-title">No Tasks Yet</div>
-                        <div class="empty-sub">Go to Tasks to create your first task</div>
-                    </div>`;
-                return;
-            }
-
-            el.innerHTML = `
-                <div class="tasks-list">
-                    ${recent.map(t => `
-                        <div class="task-item">
-                            <div class="task-info">
-                                <div class="task-title-row">
-                                    <span class="task-name">${escHtml(t.title)}</span>
-                                    ${badge(t.status)} ${badge(t.priority)}
-                                </div>
-                                ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>`;
-        }
-        async function loadDashboardTasks() {
-    const container = document.getElementById('dash-tasks');
-    if (!container) return;
+    // 1. Reset UI to show loading or empty state while fetching
+    const el = document.getElementById('dash-tasks');
+    if (el) el.innerHTML = '<div style="color: #9ca3af; padding: 20px;">Updating dashboard...</div>';
 
     try {
-        const tasks = await api('GET', '/tasks/recent'); 
-        
-        if (!tasks || tasks.length === 0) {
-            container.innerHTML = `<div style="color: #9ca3af; padding: 10px;">No recent tasks.</div>`;
-            return;
-        }
+        // 2. Refresh stats and invitations independently
+        // These should fetch from /users/me/summary or similar
+        await updateStats(); 
+        await checkInvitations();
 
-        // Professional Grid Layout
-        container.style.display = "grid";
-        container.style.gridTemplateColumns = "repeat(auto-fill, minmax(280px, 1fr))";
-        container.style.gap = "16px";
+        // 3. Load the tasks directly from the API
+        // This function now handles the fetching and rendering
+        await loadDashboardTasks();
 
-        container.innerHTML = tasks.map(task => {
-            const statusColor = task.status === 'Completed' ? '#10b981' : '#3b82f6';
-            const priorityColor = task.priority === 'High' ? '#ef4444' : '#f59e0b';
-
-            return `
-                <div class="task-card-pro" 
-                     style="background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; transition: 0.2s;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <span style="background: ${statusColor}22; color: ${statusColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
-                            ${task.status}
-                        </span>
-                        <span style="background: ${priorityColor}22; color: ${priorityColor}; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">
-                            ${task.priority}
-                        </span>
-                    </div>
-                    <h4 style="margin: 0 0 4px 0; color: #fff; font-size: 15px;">${task.title}</h4>
-                    <p style="margin: 0; color: #9ca3af; font-size: 12px; line-height: 1.4;">${task.description || ''}</p>
-                </div>
-            `;
-        }).join('');
     } catch (err) {
-        console.error("Dashboard load failed:", err);
+        console.error("Dashboard render failed:", err);
     }
 }
 
-        function updateStats() {
-            document.getElementById('stat-orgs').textContent = state.orgs.length;
-            document.getElementById('stat-projects').textContent = state.projects.length;
-            document.getElementById('stat-tasks').textContent = state.tasks.length;
-            document.getElementById('stat-done').textContent = state.tasks.filter(t => t.status === 'Done').length;
+
+       async function loadDashboardTasks() {
+    const el = document.getElementById('dash-tasks');
+    if (!el) return;
+
+    try {
+        // Fetch fresh tasks from the backend
+        // This ensures data doesn't vanish on refresh
+        const tasks = await api('GET', '/tasks/recent'); 
+        
+        if (!tasks || tasks.length === 0) {
+            el.innerHTML = `
+                <div class="empty-state" style="text-align: center; padding: 40px; border: 1px dashed #374151; border-radius: 12px;">
+                    <div style="font-size: 30px; margin-bottom: 10px;">✅</div>
+                    <div style="color: #ffffff; font-weight: 600; font-size: 1.1rem;">No Tasks Yet</div>
+                    <div style="color: #9ca3af; font-size: 0.9rem; margin-top: 4px;">Go to Tasks to create your first task</div>
+                </div>`;
+            return;
         }
+
+        // Professional Grid Layout for Recent Tasks
+        el.style.display = "grid";
+        el.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+        el.style.gap = "16px";
+
+        el.innerHTML = tasks.map(t => {
+            const statusColor = t.status === 'Completed' ? '#10b981' : '#3b82f6';
+            const priorityColor = t.priority === 'High' ? '#ef4444' : '#f59e0b';
+
+            return `
+                <div class="task-card-pro" onclick="showTaskDetail('${t.id}')" 
+                     style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 18px; cursor: pointer; transition: 0.3s ease;">
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="background: ${statusColor}15; color: ${statusColor}; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
+                            ${t.status}
+                        </span>
+                        <span style="color: ${priorityColor}; font-size: 11px; font-weight: 600;">
+                            ${t.priority}
+                        </span>
+                    </div>
+
+                    <h4 style="margin: 0 0 6px 0; color: #ffffff; font-size: 15px; font-weight: 600;">${escHtml(t.title)}</h4>
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                        ${t.description ? escHtml(t.description) : 'No description provided.'}
+                    </p>
+
+                    <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #1f2937; display: flex; align-items: center; justify-content: space-between; color: #6b7280; font-size: 11px;">
+                         <span><i class="far fa-calendar-alt"></i> ${new Date(t.created_at).toLocaleDateString()}</span>
+                         <div style="width: 24px; height: 24px; background: #4f46e5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white; font-weight: bold;">
+                            ${t.assignee_name ? t.assignee_name.charAt(0) : 'U'}
+                         </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Failed to load recent tasks:", err);
+    }
+}
+
+        async function updateStats() {
+    try {
+        // You should have an endpoint that returns {total_orgs: X, total_projects: Y, etc.}
+        const stats = await api('GET', '/users/me/summary'); 
+        
+        document.getElementById('stat-orgs').innerText = stats.total_orgs || 0;
+        document.getElementById('stat-projects').innerText = stats.total_projects || 0;
+        document.getElementById('stat-tasks').innerText = stats.total_tasks || 0;
+        document.getElementById('stat-done').innerText = stats.completed_tasks || 0;
+    } catch (err) {
+        console.warn("Could not update dashboard stats:", err);
+    }
+}
 
         // ===================================================
         // MODAL ERROR

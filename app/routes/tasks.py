@@ -73,7 +73,8 @@ async def delete_task(
 @router.get("/tasks/project/{project_id}", response_model=List[TaskResponse])
 async def get_project_tasks(
     project_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user) # Add this line!
 ):
     return await TaskService.get_tasks_by_project(db, project_id)
 
@@ -95,3 +96,22 @@ async def update_task_status(
         raise HTTPException(status_code=404, detail="Task not found")
         
     return task
+
+# In app/routes/tasks.py
+
+@router.get("/tasks/recent")
+async def get_recent_tasks(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from sqlalchemy import select
+    from app.models.task import Task
+
+    result = await db.execute(
+        select(Task)
+        # CHANGE 'assignee_id' TO 'assigned_to' (or whatever matches your model)
+        .where(Task.assigned_to == current_user.id) 
+        .order_by(Task.created_at.desc())
+        .limit(5)
+    )
+    return result.scalars().all()

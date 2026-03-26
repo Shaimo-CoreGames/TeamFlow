@@ -9,6 +9,10 @@ from app.schemas.user_schema import UserResponse, UserUpdate
 from app.models.user import User
 from app.services.user_service import UserService
 from app.dependencies.auth_dependency import get_current_user
+from sqlalchemy import func, select
+from app.models.organization import Organization
+from app.models.task import Task
+from app.models.project import Project
 
 
 router = APIRouter(
@@ -155,3 +159,55 @@ async def delete_user(
         )
 
     return None
+
+from sqlalchemy import func, select
+
+@router.get("/me/summary")
+async def get_user_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Ensure we are using the string version of the ID for the query
+    user_id_str = str(current_user.id)
+
+    # 1. Total Orgs owned by user
+    org_count = await db.scalar(
+        select(func.count(Organization.id))
+        .where(Organization.owner_id == user_id_str)
+    )
+
+    # 2. Total Projects in those Orgs (Implemented)
+    # This counts projects belonging to any organization the user owns
+    project_count = await db.scalar(
+        select(func.count(Project.id))
+        .join(Organization)
+        .where(Organization.owner_id == user_id_str)
+    )
+
+    # 3. Count tasks assigned to user (Direct match)
+    task_count = await db.scalar(
+        select(func.count(Task.id))
+        .where(Task.assigned_to == user_id_str)
+    )
+    
+    # 4. Count completed tasks (Case-insensitive check)
+    done_count = await db.scalar(
+        select(func.count(Task.id))
+        .where(
+            Task.assigned_to == str(current_user.id),
+            # This handles "completed", "Completed", and "  completed  "
+            func.lower(func.trim(Task.status)) == "completed"
+        )
+    )
+    print(f"DEBUG: Current User ID String: '{user_id_str}'")
+    # Get one task from DB to see what its assigned_to looks like
+    result = await db.execute(select(Task.assigned_to).limit(1))
+    raw_val = result.scalar()
+    print(f"DEBUG: Example Task assigned_to in DB: '{raw_val}'")
+
+    return {
+        "total_orgs": org_count or 0,
+        "total_projects": project_count or 0,
+        "total_tasks": task_count or 0,
+        "completed_tasks": done_count or 0
+    }
