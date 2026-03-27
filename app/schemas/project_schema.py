@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-
+from typing import Optional
 # ==============================
 # Base
 # ==============================
@@ -48,6 +48,7 @@ class ProjectMemberResponse(BaseModel):
 class ProjectResponse(ProjectBase):
     id: str
     organization_id: str
+    organization_name: Optional[str] = None  # <--- ADD THIS LINE
     created_by: str
     created_at: datetime
     # Add this line to include the members in the JSON response

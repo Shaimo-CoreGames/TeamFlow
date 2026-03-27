@@ -53,8 +53,13 @@ class TaskResponse(TaskBase):
     id: str
     project_id: str
     assigned_to: Optional[str] = None
-    # --- ADD THIS LINE ---
     assignee: Optional[UserMin] = None 
+    
+    # --- ADD THESE FOR THE UI ---
+    project_name: Optional[str] = None
+    organization_name: Optional[str] = None
+    organization_id: Optional[str] = None # Helpful for navigation
+    
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

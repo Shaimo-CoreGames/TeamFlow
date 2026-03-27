@@ -105,8 +105,8 @@
             <div class="topnav-nav">
                 <button class="nav-btn active" onclick="showView('dashboard')">Dashboard</button>
                 <button class="nav-btn" onclick="showView('orgs')">Organizations</button>
-                <button class="nav-btn" onclick="showView('projects')">Projects</button>
-                <button class="nav-btn" onclick="showView('tasks')">Tasks</button>
+                <button class="nav-btn" onclick="showView('all-projects')">Projects</button>
+                <button class="nav-btn" onclick="showView('all-tasks')">Tasks</button>
                 <button class="nav-btn" onclick="showView('members')">Members</button>
                 <button class="nav-btn" onclick="showView('profile')">Profile</button>
             </div>
@@ -252,6 +252,72 @@
                     </div>
                 </div>
             </div>
+
+            <div id="view-all-projects" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">All My Projects</div>
+                        <div class="page-sub">A unified view across all your organizations.</div>
+                    </div>
+                </div>
+
+                <div class="search-container" style="margin-bottom: 20px;">
+                    <div class="form-group" style="position: relative;">
+                        <i class="fas fa-search" style="position: absolute; left: 15px; top: 12px; color: #9ca3af;"></i>
+                        <input type="text" id="global-project-search" class="form-input"
+                            placeholder="Search projects or organizations..." style="padding-left: 45px;"
+                            onkeyup="filterGlobalProjects()">
+                    </div>
+                </div>
+
+                <div id="global-projects-grid" class="cards-grid">
+                    <div class="loader">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+
+                <div id="global-projects-empty"
+                    style="display: none; text-align: center; padding: 40px; color: #9ca3af;">
+                    <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                    <h3>No projects found.</h3>
+                </div>
+            </div>
+            <div id="view-all-tasks" class="view">
+                <div class="page-header">
+                    <h1 class="page-title">My Tasks</h1>
+                    <p class="page-sub">All tasks assigned to you across all projects.</p>
+                </div>
+
+                <div id="global-tasks-grid" class="project-grid" style="margin-top: 20px;">
+                </div>
+
+                <div id="global-tasks-empty" style="display: none; text-align: center; padding: 40px; color: #9ca3af;">
+                    <i class="fas fa-check-circle" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                    <h3>You're all caught up!</h3>
+                    <p>No tasks found assigned to you.</p>
+                </div>
+            </div>
+            <div id="view-all-members" class="view">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Team Directory</div>
+                        <div class="page-sub">Everyone you're working with across all organizations.</div>
+                    </div>
+                </div>
+
+                <div class="search-container" style="margin-bottom: 25px;">
+                    <div class="form-group" style="position: relative; max-width: 400px;">
+                        <i class="fas fa-search" style="position: absolute; left: 15px; top: 12px; color: #9ca3af;"></i>
+                        <input type="text" id="member-search" class="form-input"
+                            placeholder="Search by name or email..." style="padding-left: 45px;"
+                            onkeyup="filterMembers()">
+                    </div>
+                </div>
+
+                <div id="global-members-grid" class="project-grid">
+                </div>
+            </div>
+
 
             <!-- TASKS VIEW -->
 

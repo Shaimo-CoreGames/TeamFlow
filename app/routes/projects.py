@@ -15,6 +15,9 @@ from app.models.membership import ProjectMember,Membership
 from app.services.project_service import ProjectService
 from app.dependencies.auth_dependency import get_current_user
 from app.models.user import User
+from sqlalchemy.orm import selectinload, joinedload # Add joinedload
+from app.models.organization import Organization # Ensure this is imported
+
 
 router = APIRouter(
     tags=["Projects"],
@@ -130,3 +133,29 @@ async def add_project_member(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Database error during assignment")
+
+
+@router.get("/projects", response_model=List[ProjectResponse])
+async def get_all_user_projects(
+    db: AsyncSession = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    query = (
+        select(Project)
+        .options(
+            selectinload(Project.project_members),
+            joinedload(Project.organization) # Grabs the Org object attached to the project
+        )
+        .join(ProjectMember, Project.id == ProjectMember.project_id)
+        .where(ProjectMember.user_id == str(current_user.id))
+    )
+    
+    result = await db.execute(query)
+    projects = result.scalars().unique().all()
+    
+    # Map the name from the joined Organization object to our response field
+    for p in projects:
+        if p.organization:
+            p.organization_name = p.organization.name
+        
+    return projects

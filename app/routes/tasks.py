@@ -13,7 +13,7 @@ from app.models.user import User
 from sqlalchemy import select
 from app.models.task import Task
 from sqlalchemy.orm import joinedload # Import this!
-
+from app.models.project import Project 
 
 router = APIRouter(
     tags=["Tasks"],
@@ -112,3 +112,29 @@ async def get_recent_tasks(
         .limit(5)
     )
     return result.scalars().all()
+
+@router.get("/tasks/my-tasks", response_model=List[TaskResponse])
+async def get_my_global_tasks(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = (
+        select(Task)
+        .options(
+            joinedload(Task.project).joinedload(Project.organization)
+        )
+        .where(Task.assigned_to == str(current_user.id))
+    )
+    
+    result = await db.execute(query)
+    tasks = result.scalars().all()
+    
+    # Map the names so the frontend can see them
+    for t in tasks:
+        if t.project:
+            t.project_name = t.project.name
+            t.organization_id = str(t.project.organization_id)
+            if t.project.organization:
+                t.organization_name = t.project.organization.name
+        
+    return tasks

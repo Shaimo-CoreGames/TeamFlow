@@ -710,7 +710,8 @@ body {
 .modal-overlay.active .modal,
 .modal-overlay.open .modal {
     transform: scale(1) translateY(0);
-} 
+}
+
 .modal-header {
     display: flex;
     align-items: center;
@@ -1069,4 +1070,130 @@ select.input-field option {
 #dash-tasks::-webkit-scrollbar {
     display: none;
     /* Keeps the dashboard clean */
+}
+
+/* ------------------------------------------------------------ */
+
+
+
+
+/* Grid for the Task Cards */
+.task-grid-global {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Individual Task Card */
+.task-card-global {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-card-global:hover {
+    transform: translateY(-5px);
+    border-color: #4f46e5;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge-org {
+    background: #4f46e5;
+    color: white;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.task-title {
+    color: white;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.task-project-name {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.task-card-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #374151;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.task-date {
+    color: #6b7280;
+}
+
+.view-link {
+    color: #818cf8;
+    font-weight: 600;
+}
+
+/* ------------------------------------------------------------------------------- */
+/* Container for the cards */
+.task-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* Creates the small box rows */
+    gap: 20px;
+    padding: 20px 0;
+}
+
+/* Individual Task Card */
+.task-card {
+    background: #111827;
+    /* Matches your project card depth */
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: transform 0.2s, border-color 0.2s;
+    cursor: pointer;
+}
+
+.task-card:hover {
+    transform: translateY(-5px);
+    border-color: #6366f1;
+}
+
+
+/* ----------------------------------------------------------------- */
+.project-grid {
+    display: grid;
+    /* This creates as many 300px columns as can fit on the screen */
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    width: 100%;
+    /* Let it use the full page width */
+}
+
+/* Ensure the card itself doesn't try to be 100% width of the screen */
+.project-card-global {
+    width: 50%;
+    /* It will fill one 'cell' of the grid (300px) */
+    min-height: 180px;
 }

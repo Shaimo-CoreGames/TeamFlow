@@ -361,39 +361,85 @@
         // ===================================================
         // VIEWS
         // ===================================================
-        function showView(name) {
+        async function showView(name) {
+    console.log("Switching to view:", name);
+
     // 1. Hide all views
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => {
+        v.classList.remove('active');
+        v.style.display = 'none'; // Extra safety for some CSS frameworks
+    });
     
-    // 2. Clear all nav buttons
+    // 2. Clear all nav buttons active state
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
     // 3. Show the target view
     const target = document.getElementById(`view-${name}`);
     if (target) {
         target.classList.add('active');
+        target.style.display = 'block'; // Ensure it's visible
     } else {
         console.error(`View "view-${name}" not found in HTML!`);
+        return; // Stop execution if view doesn't exist
     }
 
-    /* CRITICAL FIX: Check if 'event' exists and if the target is a nav-btn.
-       This prevents the "Nothing happens" crash when calling from JS logic.
-    */
+    // 4. Highlight the correct Nav Button
+    // We check if an event exists, otherwise we find the button by its text or onclick
     if (typeof event !== 'undefined' && event && event.target && event.target.classList.contains('nav-btn')) {
         event.target.classList.add('active');
+    } else {
+        // Fallback: Find button by matching the view name in the onclick attribute
+        const navBtn = document.querySelector(`.nav-btn[onclick*="'${name}'"]`);
+        if (navBtn) navBtn.classList.add('active');
     }
 
-    // 4. Trigger Renders
-if (name === 'dashboard') { renderDashboard();
-    loadDashboardTasks(); // ADD THIS LINE HERE
-}
-    if (name === 'projects') renderProjects();
-    if (name === 'tasks') renderTasks();
-    if (name === 'members') renderMembers();
-    if (name === 'profile') renderProfile();
-    if (name === 'org-settings') renderOrgSettings();
-}
+    // 5. Trigger Renders / Data Loading
+    switch (name) {
+        case 'dashboard':
+            renderDashboard();
+            if (typeof loadDashboardTasks === 'function') loadDashboardTasks();
+            break;
 
+        case 'orgs':
+            if (typeof loadOrgs === 'function') loadOrgs();
+            break;
+
+        case 'all-projects':
+            // This is your NEW Global Navbar view
+            if (typeof loadAllProjectsView === 'function') loadAllProjectsView();
+            break;
+
+        case 'projects':
+            // This is your INTERNAL Org Projects view
+            renderProjects();
+            break;
+
+        case 'project-detail':
+            // This is your Kanban / Task board view
+            // No direct render needed here usually as it's triggered by loadProjectTasks
+            break;
+
+        case 'tasks':
+            renderTasks();
+            break;
+
+        case 'members':
+            renderMembers();
+            break;
+
+        case 'profile':
+            renderProfile();
+            break;
+
+        case 'org-settings':
+            renderOrgSettings();
+            break;
+        
+        case 'all-tasks':
+            loadGlobalTasks();
+            break;
+    }
+}
         // ===================================================
         // ORGS
         // ===================================================
@@ -893,6 +939,97 @@ if (inviteRoleSelect && org.custom_roles) {
             document.getElementById(`modal-${type}`).classList.add('active');
         }
 
+        async function loadAllProjectsView() {
+    const grid = document.getElementById('global-projects-grid');
+    const empty = document.getElementById('global-projects-empty');
+    
+    grid.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    empty.style.display = 'none';
+
+    try {
+        // Fetch ALL projects from your backend
+        // (Ensure your backend has an endpoint like /projects that returns everything for the user)
+        const projects = await api('GET', '/projects'); 
+
+        if (!projects || projects.length === 0) {
+            grid.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+
+        // Render with a "Global" template
+        // Inside loadAllProjectsView in app.js
+        grid.innerHTML = projects.map(p => `
+    <div class="card project-card-global" onclick="enterOrganizationAndProject('${p.organization_id}', '${p.id}')">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <span class="badge" style="background:#4f46e5; font-size:10px; padding:2px 10px; border-radius:4px; color:white; font-weight:bold;">
+                ${p.organization_name || 'Organization'} 
+            </span>
+        </div>
+        <h3 style="margin-top:10px; color:white;">${p.name}</h3>
+        <p style="color:#9ca3af; font-size:13px;">${p.description || 'No description'}</p>
+        <div style="margin-top:15px; border-top:1px solid #374151; padding-top:10px; font-size:12px; color:#818cf8;">
+            View Tasks →
+        </div>
+    </div>
+`).join('');
+
+    } catch (e) {
+        console.error("Global Projects Load Error:", e);
+        grid.innerHTML = '<p style="color:red;">Failed to load all projects.</p>';
+    }
+}
+function filterGlobalProjects() {
+    // 1. Get the search string
+    const input = document.getElementById('global-project-search');
+    const filter = input.value.toLowerCase();
+    
+    // 2. Get all the cards in the global grid
+    const grid = document.getElementById('global-projects-grid');
+    const cards = grid.getElementsByClassName('project-card-global');
+
+    let visibleCount = 0;
+
+    // 3. Loop through cards and hide those that don't match
+    for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        // We search the entire text of the card (Name + Org Name)
+        const content = card.textContent || card.innerText;
+        
+        if (content.toLowerCase().indexOf(filter) > -1) {
+            card.style.display = ""; // Show
+            visibleCount++;
+        } else {
+            card.style.display = "none"; // Hide
+        }
+    }
+
+    // 4. Handle "No Results" message
+    const emptyMsg = document.getElementById('global-projects-empty');
+    if (visibleCount === 0 && filter !== "") {
+        emptyMsg.style.display = "block";
+        emptyMsg.innerHTML = `<h3>No matches for "${filter}"</h3>`;
+    } else if (visibleCount === 0 && filter === "") {
+        emptyMsg.style.display = "block"; // Truly empty
+    } else {
+        emptyMsg.style.display = "none";
+    }
+}
+
+// Helper to switch context when a global project is clicked
+async function enterOrganizationAndProject(orgId, projectId) {
+    state.currentOrgId = orgId;
+    state.currentProjectId = projectId;
+    
+    // Switch to the Project Detail (Kanban) view
+    showView('project-detail'); 
+    
+    // Load the specific data for that project
+    if (typeof loadProjectTasks === 'function') {
+        loadProjectTasks(projectId);
+    }
+}
+
 
 
         function closeModal(type) {
@@ -1309,6 +1446,62 @@ if (inviteRoleSelect && org.custom_roles) {
     showModal(modalContent);
 }
 
+        async function loadGlobalTasks() {
+    const grid = document.getElementById('global-tasks-grid');
+    const empty = document.getElementById('global-tasks-empty');
+    
+    grid.innerHTML = '<div class="loader"></div>';
+    
+    try {
+        const tasks = await api('GET', '/tasks/my-tasks');
+        
+        if (!tasks || tasks.length === 0) {
+            grid.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+
+        empty.style.display = 'none';
+        
+        grid.innerHTML = tasks.map(t => `
+            <div class="card project-card-global" onclick="goToTask('${t.organization_id}', '${t.project_id}', '${t.id}')">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="badge" style="background:#4f46e5; font-size:10px; padding:2px 10px; border-radius:4px; color:white; font-weight:bold;">
+                        ${t.organization_name || 'ACM'} 
+                    </span>
+                    <span class="status-pill ${t.status}" style="font-size: 10px; padding: 2px 8px;">
+                        ${t.status.replace('_', ' ')}
+                    </span>
+                </div>
+                
+                <h3 style="margin-top:15px; color:white; margin-bottom: 5px;">${t.title}</h3>
+                <p style="color:#9ca3af; font-size:13px; margin-bottom: 10px;">
+                    <i class="fas fa-folder-open" style="font-size: 11px;"></i> ${t.project_name}
+                </p>
+                
+                <div style="margin-top:auto; border-top:1px solid #374151; padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:12px; color:${t.due_date ? '#f87171' : '#6b7280'};">
+                        <i class="far fa-calendar-alt"></i> ${t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No date'}
+                    </span>
+                    <span style="color:#818cf8; font-size:12px; font-weight:500;">Details →</span>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (e) {
+        console.error("Global Tasks Error:", e);
+        grid.innerHTML = '<p style="color:red; text-align:center; width:100%;">Failed to load tasks.</p>';
+    }
+}
+
+// Function to "Jump" to the specific project when a task is clicked
+function goToTask(orgId, projectId, taskId) {
+    state.currentOrgId = orgId;
+    state.currentProjectId = projectId;
+    showView('project-detail'); // Switch to Kanban
+    // loadProjectTasks(projectId); // Existing function to load the board
+}
+
         async function submitAddProjectMember(projectId) {
             const email = document.getElementById('proj-member-email').value;
             if (!email) {
@@ -1435,6 +1628,8 @@ if (inviteRoleSelect && org.custom_roles) {
                 console.error("Search failed", err);
             }
         }
+
+
 
         function initials(name) {
             if (!name) return '?';
