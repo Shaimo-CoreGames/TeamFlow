@@ -2308,7 +2308,7 @@ async function deleteComment(commentId) {
                     </div>
 
                     <h4 style="margin: 0 0 6px 0; color: #ffffff; font-size: 15px; font-weight: 600;">${escHtml(t.title)}</h4>
-                    <p style="margin: 0; color: #0f0f0f; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    <p style="margin: 0; color: #ffffff; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
                         ${t.description ? escHtml(t.description) : 'No description provided.'}
                     </p>
 

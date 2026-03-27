@@ -384,7 +384,7 @@ body {
 
 /* ===== MAIN CONTENT ===== */
 .main-content {
-    margin-top: 60px;
+    margin-top: 10px;
     flex: 1;
     padding: 32px;
     max-width: 1400px;
