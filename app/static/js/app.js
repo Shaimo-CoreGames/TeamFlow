@@ -894,33 +894,19 @@ if (inviteRoleSelect && org.custom_roles) {
 
 
         function closeModal(type) {
-    console.log(`Closing modal: ${type}`);
-    
-    // 1. Target the specific overlay
-    const modalOverlay = document.getElementById(`modal-${type}`);
-    if (modalOverlay) {
-        modalOverlay.style.display = 'none';
-        modalOverlay.classList.remove('active', 'open');
+    // This handles modal-org, modal-project, etc.
+    const modal = document.getElementById(`modal-${type}`);
+
+    if (modal) {
+        modal.classList.remove('active', 'open');
+        modal.style.display = 'none'; 
     }
 
-    // 2. NUCLEAR: Remove ANY element that looks like a backdrop or overlay
-    // This fixes the "frozen screen" issue by deleting the invisible walls
-    const genericOverlays = document.querySelectorAll('.modal-overlay, .modal-backdrop, .overlay');
-    genericOverlays.forEach(el => {
-        el.style.display = 'none';
-        el.classList.remove('active', 'open');
-    });
-
-    // 3. Unfreeze the body
+    // This is what actually "unfreezes" your mouse
     document.body.classList.remove('modal-open');
     document.body.style.overflow = 'auto';
-    document.body.style.pointerEvents = 'auto'; // Force clicks back on
-
-    // 4. Reset data
-    const editIdEl = document.getElementById(`${type}-edit-id`);
-    if (editIdEl) editIdEl.value = "";
+    document.body.style.pointerEvents = 'auto';
 }
-
         function populateOrgSelect(selectId) {
             const sel = document.getElementById(selectId);
             sel.innerHTML = state.orgs.map(o => `<option value="${o.id}">${escHtml(o.name)}</option>`).join('') || '<option value="">No organizations</option>';
@@ -972,72 +958,59 @@ if (inviteRoleSelect && org.custom_roles) {
         }
 
         async function saveOrg() {
-            console.log("Save process started...");
+    console.log("Save Org Process Started");
+    const errorEl = document.getElementById('org-error');
+    
+    const name = document.getElementById('org-name').value;
+    const slug = document.getElementById('org-slug').value;
+    const description = document.getElementById('org-description').value;
 
-            const nameEl = document.getElementById('org-name');
-            const slugEl = document.getElementById('org-slug');
-            const descEl = document.getElementById('org-description');
-            const editIdEl = document.getElementById('org-edit-id');
-            const errorEl = document.getElementById('org-error');
+    try {
+        const response = await fetch('/organizations/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`
+            },
+            body: JSON.stringify({ name, slug, description })
+        });
 
-            // 1. Validate elements exist
-            if (!nameEl || !slugEl || !descEl || !errorEl) {
-                console.error("Missing HTML elements!");
-                return;
+        if (response.ok) {
+            console.log("Save Success! Closing modal now...");
+            
+            // --- THE DIRECT FIX ---
+            const orgModal = document.getElementById('modal-org');
+            if (orgModal) {
+                orgModal.classList.remove('active');
+                orgModal.classList.remove('open');
+                orgModal.style.display = 'none'; // Force hide
             }
+            
+            // Unlock the screen
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = 'auto'; 
+            document.body.style.pointerEvents = 'auto';
 
-            const name = nameEl.value.trim();
-            const slug = slugEl.value.trim();
-            const description = descEl.value.trim();
-            const editId = editIdEl ? editIdEl.value : null;
-
-            if (!name || !slug) {
-                errorEl.textContent = "Name and Slug are required.";
-                errorEl.style.display = 'block';
-                return;
+            // Refresh UI
+            if (typeof loadOrgs === 'function') {
+                await loadOrgs();
+            } else if (typeof loadOrganizations === 'function') {
+                await loadOrganizations();
+            } else {
+                window.location.reload();
             }
-
-            // 2. DEFINE URL AND METHOD HERE (Fixes the 'not defined' error)
-            const method = editId ? 'PUT' : 'POST';
-            const url = editId ? `/organizations/${editId}` : '/organizations/';
-            const payload = { name, slug, description };
-
-            console.log(`Sending ${method} to ${url}`);
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${state.token}`
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                // 3. Handle the response
-                if (!response.ok) {
-                    const result = await response.json();
-                    throw new Error(result.detail || "Failed to save organization");
-                }
-
-                console.log("Save successful!");
-
-                // 4. Close modal and refresh UI
-                closeModal('org');
-
-                if (typeof loadOrgs === 'function') {
-                    await loadOrgs();
-                } else {
-                    window.location.reload();
-                }
-
-            } catch (err) {
-                console.error("Save error:", err);
-                errorEl.textContent = err.message;
-                errorEl.style.display = 'block';
-            }
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || "Failed to save organization");
         }
-
+    } catch (err) {
+        console.error(err);
+        if (errorEl) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+}
         // ===================================================
         // PROJECTS
         // ===================================================
@@ -1145,31 +1118,60 @@ if (inviteRoleSelect && org.custom_roles) {
         showToast('Error syncing project data', 'error');
     }
 }
+
         async function saveProject() {
-            const nameEl = document.getElementById('project-name');
-            const name = nameEl.value.trim();
+    console.log("Save Project Started...");
+    
+    const nameEl = document.getElementById('project-name');
+    const name = nameEl.value.trim();
+    const orgId = state.currentOrgId;
 
-            // Automatically pull from state
-            const orgId = state.currentOrgId;
+    if (!name || !orgId) {
+        console.error("Missing name or orgId:", { name, orgId });
+        return;
+    }
 
-            if (!name) return showModalError('project', 'Project name is required');
-            if (!orgId) return showModalError('project', 'Please select an organization first');
+    try {
+        // 1. API Call
+        const url = `/organizations/${orgId}/projects`;
+        await api('POST', url, { name });
+        console.log("API Success: Project created.");
 
-            try {
-                // Use the nested API path
-                const url = `/organizations/${orgId}/projects`;
-                await api('POST', url, { name });
-
-                showToast(`Project created in ${state.currentOrgName}`);
-                closeModal('project');
-
-                // Reset and Refresh
-                nameEl.value = '';
-                loadProjects(orgId);
-            } catch (e) {
-                showModalError('project', e.message);
-            }
+        // 2. IMMEDIATE UI UNLOCK (Pehle screen free karo)
+        const projModal = document.getElementById('modal-project');
+        if (projModal) {
+            projModal.classList.remove('active', 'open');
+            projModal.style.display = 'none';
         }
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = 'auto';
+        document.body.style.pointerEvents = 'auto';
+
+        // 3. Clear Input
+        nameEl.value = '';
+        if (typeof showToast === 'function') showToast("Project created!", "success");
+
+        // 4. SAFE REFRESH (Isme error aaya toh console dikhayega par screen freeze nahi hogi)
+        console.log("Attempting to refresh project list for org:", orgId);
+        try {
+            if (typeof loadProjects === 'function') {
+                await loadProjects(orgId);
+            }
+        } catch (refreshErr) {
+            console.warn("Refresh failed but project was saved:", refreshErr);
+            // Agar list load nahi hui toh page reload kar do as backup
+            window.location.reload();
+        }
+
+    } catch (e) {
+        console.error("Critical Save Error:", e);
+        if (typeof showModalError === 'function') {
+            showModalError('project', e.message);
+        } else {
+            alert("Error: " + e.message);
+        }
+    }
+}
 
         function openEditProject(id) {
             const p = state.projects.find(x => x.id === id);

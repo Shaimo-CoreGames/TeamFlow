@@ -665,33 +665,37 @@ body {
 }
 
 /* ===== MODAL ===== */
+/* Base state: Totally hidden and click-through */
 .modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.8);
-    /* Darker overlay */
     backdrop-filter: blur(8px);
     z-index: 9999;
-    /* Ensure it is above everything */
     display: none;
-    /* Change from opacity:0 to display:none */
+    /* Primary hiding method */
+    opacity: 0;
+    /* For animations */
+    pointer-events: none;
+    /* Prevent clicking when "fading" */
     align-items: center;
     justify-content: center;
     padding: 20px;
+    transition: opacity 0.2s ease;
 }
 
-/* Add this specifically */
-.modal-overlay.active {
-    display: flex;
-    /* This makes it visible */
-    animation: fadeIn 0.2s ease;
-}
-
+/* Show state: Flex + Opacity + Pointer Events */
+.modal-overlay.active,
 .modal-overlay.open {
-    opacity: 1;
-    pointer-events: all;
+    display: flex !important;
+    /* Force flex layout */
+    opacity: 1 !important;
+    /* Force visibility */
+    pointer-events: auto !important;
+    /* Enable clicking */
 }
 
+/* Modal box animation */
 .modal {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -701,14 +705,12 @@ body {
     max-width: 480px;
     transform: scale(0.95) translateY(10px);
     transition: transform 0.2s;
-    max-height: 90vh;
-    overflow-y: auto;
 }
 
+.modal-overlay.active .modal,
 .modal-overlay.open .modal {
     transform: scale(1) translateY(0);
-}
-
+} 
 .modal-header {
     display: flex;
     align-items: center;
