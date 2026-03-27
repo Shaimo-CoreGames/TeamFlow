@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Optional
 
-from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
@@ -37,7 +36,8 @@ class UserLogin(BaseModel):
 # ==============================
 
 class UserResponse(UserBase):
-    id: UUID    
+    id: str    
+    # --- ADD THESE SO THEY SHOW UP IN THE JSON ---
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -63,8 +63,11 @@ class TokenPayload(BaseModel):
 # ==============================
 
 class UserUpdate(BaseModel):
+    # Allow name to be None so we don't have to send it every time
     name: Optional[str] = Field(None, min_length=2, max_length=100)
-    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    # Change min_length to 6 to match your other schemas
+    password: Optional[str] = Field(None, min_length=6, max_length=128)
 
+    model_config = ConfigDict(from_attributes=True)
 class InviteUserRequest(BaseModel):
     user_id: str

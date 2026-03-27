@@ -26,7 +26,7 @@ app.include_router(organizations.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(comments.router)
-# app.include_router(memberships.router)
+app.include_router(memberships.router)
 
 @app.get("/")
 async def read_index():

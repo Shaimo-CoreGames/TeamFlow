@@ -1,9 +1,9 @@
-from sqlalchemy import select
+from sqlalchemy import select,func
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.core.security import hash_password
 from app.database import get_db
 from app.schemas.user_schema import UserResponse, UserUpdate
 from app.models.user import User
@@ -88,42 +88,34 @@ async def get_user_by_id(
 # Update User
 # --------------------------------------------------------
 
-@router.put(
-    "/{user_id}",
-    response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-)
+# app/routes/users.py
+
+# If main.py uses prefix="/users", this should just be "/{user_id}"
+# app/routes/users.py
+
+@router.put("/{user_id}", response_model=UserResponse) 
 async def update_user(
-    user_id: str,
-    user_data: UserUpdate,
+    user_id: str, # Change this from UUID to str
+    user_update: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
-    """
-    Update a user.
-    Only allow self-update or admin (optional logic).
-    """
+    # Convert string to the format your DB uses (UUID or keep as str)
+    # Check if the user is trying to update someone else
+    if str(user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to update this profile")
 
-    # Optional: prevent updating other users
-    if current_user.id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this user",
-        )
+    # Update fields
+    if user_update.name is not None:
+        current_user.name = user_update.name
+    
+    if user_update.password:
+        # Assuming you have a pwd_context or hash function
+        current_user.hashed_password = hash_password(user_update.password)
 
-    updated_user = await UserService.update_user(
-        db=db,
-        user_id=user_id,
-        user_data=user_data,
-    )
-
-    if not updated_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    return updated_user
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 # --------------------------------------------------------
@@ -159,8 +151,6 @@ async def delete_user(
         )
 
     return None
-
-from sqlalchemy import func, select
 
 @router.get("/me/summary")
 async def get_user_summary(

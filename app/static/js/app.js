@@ -438,6 +438,10 @@
         case 'all-tasks':
             loadGlobalTasks();
             break;
+        
+        case 'all-members': // Make sure this matches your navbar 'all-members'
+            loadGlobalMembers(); 
+            break;
     }
 }
         // ===================================================
@@ -1494,6 +1498,66 @@ async function enterOrganizationAndProject(orgId, projectId) {
     }
 }
 
+async function loadGlobalMembers() {
+    const grid = document.getElementById('global-members-grid');
+    grid.innerHTML = '<div class="loader"></div>';
+
+    try {
+        const members = await api('GET', '/members/directory');
+        
+        grid.innerHTML = members.map(m => `
+            <div class="card member-card" style="min-height: 150px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 25px;">
+                <div class="avatar-circle" style="width: 60px; height: 60px; background: #4f46e5; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; margin-bottom: 15px;">
+                    ${m.full_name ? m.full_name.charAt(0).toUpperCase() : m.email.charAt(0).toUpperCase()}
+                </div>
+                
+                <h3 style="color: white; margin-bottom: 5px; font-size: 1.1rem;">${m.full_name || 'Team Member'}</h3>
+                <p style="color: #9ca3af; font-size: 13px; margin-bottom: 15px;">${m.email}</p>
+                
+                <div style="margin-top: auto; width: 100%; border-top: 1px solid #374151; padding-top: 15px;">
+                    <a href="mailto:${m.email}" style="color: #818cf8; text-decoration: none; font-size: 12px; font-weight: 500;">
+                        <i class="far fa-envelope"></i> Send Email
+                    </a>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        grid.innerHTML = '<p style="color:red;">Error loading directory.</p>';
+    }
+}
+function filterMembers() {
+    const searchTerm = document.getElementById('member-search').value.toLowerCase();
+    const cards = document.querySelectorAll('#global-members-grid .member-card');
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+        const name = card.querySelector('h3').innerText.toLowerCase();
+        const email = card.querySelector('p').innerText.toLowerCase();
+
+        if (name.includes(searchTerm) || email.includes(searchTerm)) {
+            card.style.display = "flex";
+            visibleCount++;
+        } else {
+            card.style.display = "none";
+        }
+    });
+
+    // Show a simple 'No results' message if everyone is hidden
+    const grid = document.getElementById('global-members-grid');
+    let noResults = document.getElementById('no-members-found');
+    
+    if (visibleCount === 0) {
+        if (!noResults) {
+            noResults = document.createElement('div');
+            noResults.id = 'no-members-found';
+            noResults.style.cssText = "color: #9ca3af; text-align: center; width: 100%; padding: 20px;";
+            noResults.innerHTML = '<i class="fas fa-user-slash"></i> No members match your search.';
+            grid.appendChild(noResults);
+        }
+    } else if (noResults) {
+        noResults.remove();
+    }
+}
 // Function to "Jump" to the specific project when a task is clicked
 function goToTask(orgId, projectId, taskId) {
     state.currentOrgId = orgId;
@@ -1855,11 +1919,11 @@ async function deleteComment(commentId) {
                 <div class="task-card" 
                     draggable="true" 
                     ondragstart="handleDragStart(event, '${task.id}')"
-                    style="background: #131924; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)}; cursor: grab; margin-bottom:10px;">
+                    style="background: #000000; padding: 12px; border-radius: 8px; border-left: 4px solid ${getStatusColor(task.status)}; cursor: grab; margin-bottom:10px;">
                     <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; color:white;">${task.title}</div>
-                    <div style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">${task.description || ''}</div>
+                    <div style="font-size: 12px; color: #c0c4c7; margin-bottom: 10px;">${task.description || ''}</div>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 10px; background: #1f2937; padding: 2px 6px; border-radius: 4px; color:#818cf8;">${task.priority}</span>
+                        <span style="font-size: 10px; background: #000000; padding: 2px 6px; border-radius: 4px; color:#818cf8;">${task.priority}</span>
                         <button onclick="confirmDeleteTask('${task.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer;">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -2146,21 +2210,37 @@ async function deleteComment(commentId) {
         }
 
         async function saveProfile() {
-            const name = document.getElementById('profile-name').value.trim();
-            const password = document.getElementById('profile-pass').value;
-            const payload = {};
-            if (name) payload.name = name;
-            if (password) payload.password = password;
-            try {
-                const updated = await api('PUT', `/users/${state.user.id}`, payload);
-                state.user = updated;
-                document.getElementById('nav-avatar').textContent = initials(updated.name);
-                document.getElementById('nav-name').textContent = updated.name;
-                showToast('Profile saved!');
-            } catch (e) {
-                showToast(e.message, 'error');
-            }
+    const nameEl = document.getElementById('profile-name');
+    const passEl = document.getElementById('profile-pass');
+    
+    const nameVal = nameEl.value.trim();
+    const passVal = passEl.value.trim();
+
+    // Start with just the name
+    const payload = { name: nameVal };
+
+    // ONLY add password if the user actually typed something
+    if (passVal !== "") {
+        if (passVal.length < 6) {
+            alert("Password must be at least 6 characters.");
+            return;
         }
+        payload.password = passVal;
+    }
+
+    try {
+        const userId = state.user.id;
+        const response = await api('PUT', `/users/${userId}`, payload);
+        alert("Profile Updated Successfully!");
+        
+        // Clear password field so it doesn't look like they have to change it again
+        passEl.value = ""; 
+    } catch (err) {
+        console.error("422 Error Detail:", err); 
+        // TIP: Check the 'Network' tab in Inspect Element to see 
+        // EXACTLY which field failed validation.
+    }
+}
 
         // ===================================================
         // DASHBOARD
@@ -2216,7 +2296,7 @@ async function deleteComment(commentId) {
 
             return `
                 <div class="task-card-pro" onclick="showTaskDetail('${t.id}')" 
-                     style="background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 18px; cursor: pointer; transition: 0.3s ease;">
+                     style="background: #232323; border: 1px solid #000000; border-radius: 12px; padding: 18px; cursor: pointer; transition: 0.3s ease;">
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                         <span style="background: ${statusColor}15; color: ${statusColor}; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
@@ -2228,7 +2308,7 @@ async function deleteComment(commentId) {
                     </div>
 
                     <h4 style="margin: 0 0 6px 0; color: #ffffff; font-size: 15px; font-weight: 600;">${escHtml(t.title)}</h4>
-                    <p style="margin: 0; color: #9ca3af; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    <p style="margin: 0; color: #0f0f0f; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
                         ${t.description ? escHtml(t.description) : 'No description provided.'}
                     </p>
 
