@@ -17,8 +17,10 @@
             members: [],
             currentOrgId: null,      // Tracks the "Active Workspace"
             currentProjectId: null,  // Tracks the "Active Project"
-            currentOrgName: null
+            currentOrgName: null,
+            isFetchingOrg: false // This prevents the infinite loop
         };
+
         async function confirmDeleteTask(taskId) {
             if (!confirm("Are you sure you want to delete this task?")) return;
 
@@ -1094,50 +1096,47 @@ if (inviteRoleSelect && org.custom_roles) {
         }
 
         async function loadProjects(orgId) {
-    try {
-        // 1. If orgId is missing, we can't do anything
-        if (!orgId) return;
+    if (!orgId) return;
 
-        // 2. If state is empty (common on refresh), fetch the Org first
-        if (!state.currentOrg || state.currentOrg.id !== orgId) {
-            console.log("State empty or org mismatch, fetching org data...");
+    // 1. Check the Lock inside the state object
+    if (state.isFetchingOrg) return; 
+
+    try {
+        const isDifferentOrg = !state.currentOrg || state.currentOrg.id !== orgId;
+
+        if (isDifferentOrg) {
+            console.log("🔄 Syncing State for Org:", orgId);
+            
+            state.isFetchingOrg = true; // SET LOCK
             const orgData = await api('GET', `/organizations/${orgId}`);
             state.currentOrg = orgData;
             state.currentOrgId = orgId;
+            state.isFetchingOrg = false; // RELEASE LOCK
         }
-        state.projects = state.currentOrg.projects || [];
-        // 4. Update UI
+
+        const projects = await api('GET', `/organizations/${orgId}/projects`);
+        state.projects = projects || [];
         renderProjects();
-        
-        // Update Header text
-        const titleEl = document.getElementById('current-org-title');
-        if (titleEl) titleEl.textContent = `${state.currentOrg.name} Projects`;
 
     } catch (e) {
-        console.error("Sync Error:", e);
-        showToast('Error syncing project data', 'error');
+        console.error("❌ loadProjects Sync Error:", e);
+        state.isFetchingOrg = false; // RELEASE LOCK ON ERROR
     }
 }
-
         async function saveProject() {
-    console.log("Save Project Started...");
-    
     const nameEl = document.getElementById('project-name');
     const name = nameEl.value.trim();
     const orgId = state.currentOrgId;
 
-    if (!name || !orgId) {
-        console.error("Missing name or orgId:", { name, orgId });
-        return;
-    }
+    if (!name || !orgId) return;
 
     try {
-        // 1. API Call
-        const url = `/organizations/${orgId}/projects`;
-        await api('POST', url, { name });
-        console.log("API Success: Project created.");
+        // Step 1: Create the project
+        await api('POST', `/organizations/${orgId}/projects`, { name });
+        console.log("✅ Project created in backend.");
 
-        // 2. IMMEDIATE UI UNLOCK (Pehle screen free karo)
+        // Step 2: IMMEDIATE UI UNLOCK (Do this BEFORE loadProjects)
+        // This ensures the "freeze" is gone instantly
         const projModal = document.getElementById('modal-project');
         if (projModal) {
             projModal.classList.remove('active', 'open');
@@ -1147,28 +1146,20 @@ if (inviteRoleSelect && org.custom_roles) {
         document.body.style.overflow = 'auto';
         document.body.style.pointerEvents = 'auto';
 
-        // 3. Clear Input
+        // Step 3: Cleanup
         nameEl.value = '';
-        if (typeof showToast === 'function') showToast("Project created!", "success");
+        if (typeof showToast === 'function') showToast(`Project created!`, "success");
 
-        // 4. SAFE REFRESH (Isme error aaya toh console dikhayega par screen freeze nahi hogi)
-        console.log("Attempting to refresh project list for org:", orgId);
-        try {
-            if (typeof loadProjects === 'function') {
-                await loadProjects(orgId);
-            }
-        } catch (refreshErr) {
-            console.warn("Refresh failed but project was saved:", refreshErr);
-            // Agar list load nahi hui toh page reload kar do as backup
-            window.location.reload();
-        }
+        // Step 4: Background Refresh (Now it's safe if this takes time)
+        await loadProjects(orgId);
 
     } catch (e) {
-        console.error("Critical Save Error:", e);
+        console.error("❌ Project Save Error:", e);
+        // Even on error, we MUST unfreeze the screen
+        document.body.style.pointerEvents = 'auto';
+        document.body.classList.remove('modal-open');
         if (typeof showModalError === 'function') {
             showModalError('project', e.message);
-        } else {
-            alert("Error: " + e.message);
         }
     }
 }
@@ -1195,29 +1186,6 @@ if (inviteRoleSelect && org.custom_roles) {
             if (displayOrgEl) displayOrgEl.value = state.currentOrgName || "";
 
             document.getElementById('modal-project').classList.add('active');
-        }
-
-        async function saveProject() {
-            const name = document.getElementById('project-name').value.trim();
-            const description = document.getElementById('project-description').value.trim();
-            const editId = document.getElementById('project-edit-id').value;
-
-            if (!name) return alert("Name is required");
-
-            const method = editId ? 'PUT' : 'POST';
-            const url = editId ? `/projects/${editId}` : `/organizations/${state.currentOrgId}/projects`;
-
-            try {
-                // Send both name and description
-                await api(method, url, { name, description });
-
-                showToast(editId ? "Project updated" : "Project created");
-                closeModal('project');
-                loadProjects(state.currentOrgId);
-            } catch (e) {
-                console.error(e);
-                alert(e.message);
-            }
         }
 
         async function deleteProject(id, name) {
