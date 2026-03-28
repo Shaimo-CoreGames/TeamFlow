@@ -1454,77 +1454,90 @@ async function enterOrganizationAndProject(orgId, projectId) {
     const grid = document.getElementById('global-tasks-grid');
     const empty = document.getElementById('global-tasks-empty');
     
+    if (!grid) return;
     grid.innerHTML = '<div class="loader"></div>';
-    
+
     try {
         const tasks = await api('GET', '/tasks/my-tasks');
-        
-        if (!tasks || tasks.length === 0) {
+        console.log("Fetched Tasks for Amir:", tasks);
+
+        // Check if tasks is actually an array and has items
+        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
             grid.innerHTML = '';
-            empty.style.display = 'block';
+            if (empty) empty.style.display = 'block';
             return;
         }
 
-        empty.style.display = 'none';
-        
-        grid.innerHTML = tasks.map(t => `
-            <div class="card project-card-global" onclick="goToTask('${t.organization_id}', '${t.project_id}', '${t.id}')">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="badge" style="background:#4f46e5; font-size:10px; padding:2px 10px; border-radius:4px; color:white; font-weight:bold;">
-                        ${t.organization_name || 'ACM'} 
-                    </span>
-                    <span class="status-pill ${t.status}" style="font-size: 10px; padding: 2px 8px;">
-                        ${t.status.replace('_', ' ')}
-                    </span>
+        if (empty) empty.style.display = 'none';
+
+        grid.innerHTML = tasks.map(t => {
+            // Safeguards to prevent JS errors inside the template literal
+            const status = t.status ? t.status.replace('_', ' ') : 'Pending';
+            const orgName = t.organization_name || 'No Organization';
+            const projName = t.project_name || 'General';
+            const dueDate = t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No date';
+
+            return `
+                <div class="card project-card-global" onclick="goToTask('${t.organization_id}', '${t.project_id}', '${t.id}')" style="cursor:pointer;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="badge" style="background:var(--accent); font-size:10px; padding:2px 10px; border-radius:4px; color:white; font-weight:bold;">
+                            ${orgName} 
+                        </span>
+                        <span class="status-pill ${t.status || 'Pending'}" style="font-size: 10px; padding: 2px 8px;">
+                            ${status}
+                        </span>
+                    </div>
+                    
+                    <h3 style="margin-top:15px; color:var(--text); margin-bottom: 5px;">${t.title}</h3>
+                    <p style="color:var(--text-muted); font-size:13px; margin-bottom: 10px;">
+                        <i class="fas fa-folder-open" style="font-size: 11px;"></i> ${projName}
+                    </p>
+                    
+                    <div style="margin-top:auto; border-top:1px solid var(--border); padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:12px; color:${t.due_date ? 'var(--accent2)' : 'var(--text-dim)'};">
+                            <i class="far fa-calendar-alt"></i> ${dueDate}
+                        </span>
+                        <span style="color:var(--accent); font-size:12px; font-weight:500;">Details →</span>
+                    </div>
                 </div>
-                
-                <h3 style="margin-top:15px; color:white; margin-bottom: 5px;">${t.title}</h3>
-                <p style="color:#9ca3af; font-size:13px; margin-bottom: 10px;">
-                    <i class="fas fa-folder-open" style="font-size: 11px;"></i> ${t.project_name}
-                </p>
-                
-                <div style="margin-top:auto; border-top:1px solid #374151; padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:12px; color:${t.due_date ? '#f87171' : '#6b7280'};">
-                        <i class="far fa-calendar-alt"></i> ${t.due_date ? new Date(t.due_date).toLocaleDateString() : 'No date'}
-                    </span>
-                    <span style="color:#818cf8; font-size:12px; font-weight:500;">Details →</span>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
     } catch (e) {
         console.error("Global Tasks Error:", e);
-        grid.innerHTML = '<p style="color:red; text-align:center; width:100%;">Failed to load tasks.</p>';
+        grid.innerHTML = '<p style="color:red; text-align:center; width:100%;">Failed to load tasks. Check console for details.</p>';
     }
 }
 
 async function loadGlobalMembers() {
     const grid = document.getElementById('global-members-grid');
+    if (!grid) return;
     grid.innerHTML = '<div class="loader"></div>';
 
     try {
         const members = await api('GET', '/members/directory');
         
         grid.innerHTML = members.map(m => `
-            <div class="card member-card" style="min-height: 150px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 25px;">
-                <div class="avatar-circle" style="width: 60px; height: 60px; background: #4f46e5; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; margin-bottom: 15px;">
-                    ${m.full_name ? m.full_name.charAt(0).toUpperCase() : m.email.charAt(0).toUpperCase()}
+            <div class="card member-card" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; text-align: center; padding: 25px; box-shadow: var(--shadow);">
+                <div class="avatar-circle" style="width: 60px; height: 60px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; margin-bottom: 15px;">
+                    ${m.name ? m.name.charAt(0).toUpperCase() : m.email.charAt(0).toUpperCase()}
                 </div>
                 
-                <h3 style="color: white; margin-bottom: 5px; font-size: 1.1rem;">${m.full_name || 'Team Member'}</h3>
-                <p style="color: #9ca3af; font-size: 13px; margin-bottom: 15px;">${m.email}</p>
+                <h3 style="color: var(--text); margin-bottom: 5px; font-size: 1.1rem; font-weight: 700;">${m.name || 'Team Member'}</h3>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">${m.email}</p>
                 
-                <div style="margin-top: auto; width: 100%; border-top: 1px solid #374151; padding-top: 15px;">
-                    <a href="mailto:${m.email}" style="color: #818cf8; text-decoration: none; font-size: 12px; font-weight: 500;">
+                <div style="margin-top: auto; width: 100%; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <a href="mailto:${m.email}" style="color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600;">
                         <i class="far fa-envelope"></i> Send Email
                     </a>
                 </div>
             </div>
         `).join('');
     } catch (e) {
-        grid.innerHTML = '<p style="color:red;">Error loading directory.</p>';
+        grid.innerHTML = '<p style="color:var(--accent2);">Error loading directory.</p>';
     }
 }
+
 function filterMembers() {
     const searchTerm = document.getElementById('member-search').value.toLowerCase();
     const cards = document.querySelectorAll('#global-members-grid .member-card');

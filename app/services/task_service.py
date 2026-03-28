@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload # CRITICAL IMPORT
 from fastapi import HTTPException
 
+from app.models.project import Project
 from app.models.task import Task
 from app.schemas.task_schema import TaskCreate, TaskUpdate
 from app.models.user import User
@@ -66,14 +67,26 @@ class TaskService:
 
     @staticmethod
     async def get_tasks_by_project(db: AsyncSession, project_id: str):
-        # This was the cause of your 500 error!
         result = await db.execute(
             select(Task)
-            .options(joinedload(Task.assignee)) # 👈 Add this
+            .options(
+                joinedload(Task.assignee),           # Loads the User (UserMin)
+                joinedload(Task.project).joinedload(Project.organization) # Loads Project & Org
+            )
             .where(Task.project_id == str(project_id))
             .order_by(Task.created_at.desc())
         )
-        return result.scalars().all()
+        tasks = result.scalars().all()
+
+        # MANUALLY MAP THE NAMES (since they aren't direct columns on the Task table)
+        for t in tasks:
+            if t.project:
+                t.project_name = t.project.name
+                if t.project.organization:
+                    t.organization_name = t.project.organization.name
+                    t.organization_id = t.project.organization.id
+                    
+        return tasks
     
     @staticmethod
     async def update_task_status(db: AsyncSession, task_id: str, status: str):

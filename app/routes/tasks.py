@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.models.task import Task
 from sqlalchemy.orm import joinedload # Import this!
 from app.models.project import Project 
+from sqlalchemy import func, String 
 
 router = APIRouter(
     tags=["Tasks"],
@@ -118,18 +119,25 @@ async def get_my_global_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Ensure we are searching by the exact string ID
+    user_id_str = str(current_user.id).strip()
+
     query = (
         select(Task)
         .options(
+            joinedload(Task.assignee),
             joinedload(Task.project).joinedload(Project.organization)
         )
-        .where(Task.assigned_to == str(current_user.id))
+        # Use func.cast to ensure the DB treats the column as a string
+        .where(func.cast(Task.assigned_to, String) == user_id_str)
     )
     
     result = await db.execute(query)
     tasks = result.scalars().all()
     
-    # Map the names so the frontend can see them
+    # Debug: See what the DB actually found
+    print(f"DEBUG: Found {len(tasks)} tasks for User ID {user_id_str}")
+
     for t in tasks:
         if t.project:
             t.project_name = t.project.name

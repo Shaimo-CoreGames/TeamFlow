@@ -1,4 +1,4 @@
-from sqlalchemy import select,func
+from sqlalchemy import distinct, or_, or_, select,func
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,7 +13,9 @@ from sqlalchemy import func, select
 from app.models.organization import Organization
 from app.models.task import Task
 from app.models.project import Project
-
+from app.models.organization import Organization
+from sqlalchemy import select, func, or_, distinct
+from app.models.membership import Membership
 
 router = APIRouter(
     prefix="/users",
@@ -157,43 +159,48 @@ async def get_user_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Ensure we are using the string version of the ID for the query
     user_id_str = str(current_user.id)
 
-    # 1. Total Orgs owned by user
-    org_count = await db.scalar(
-        select(func.count(Organization.id))
-        .where(Organization.owner_id == user_id_str)
+    # 1. Total Orgs (Owned OR Joined via Membership)
+    org_query = (
+        select(func.count(distinct(Organization.id)))
+        .outerjoin(Membership, Organization.id == Membership.organization_id) # Join with Membership
+        .where(
+            or_(
+                Organization.owner_id == user_id_str,
+                Membership.user_id == user_id_str
+            )
+        )
     )
+    org_count = await db.scalar(org_query)
 
-    # 2. Total Projects in those Orgs (Implemented)
-    # This counts projects belonging to any organization the user owns
-    project_count = await db.scalar(
-        select(func.count(Project.id))
+    # 2. Total Projects (In Orgs he owns OR belongs to)
+    project_query = (
+        select(func.count(distinct(Project.id)))
         .join(Organization)
-        .where(Organization.owner_id == user_id_str)
+        .outerjoin(Membership, Organization.id == Membership.organization_id)
+        .where(
+            or_(
+                Organization.owner_id == user_id_str,
+                Membership.user_id == user_id_str
+            )
+        )
     )
+    project_count = await db.scalar(project_query)
 
-    # 3. Count tasks assigned to user (Direct match)
+    # 3. Total Tasks assigned to him
     task_count = await db.scalar(
-        select(func.count(Task.id))
-        .where(Task.assigned_to == user_id_str)
+        select(func.count(Task.id)).where(Task.assigned_to == user_id_str)
     )
     
-    # 4. Count completed tasks (Case-insensitive check)
+    # 4. Completed Tasks
     done_count = await db.scalar(
         select(func.count(Task.id))
         .where(
-            Task.assigned_to == str(current_user.id),
-            # This handles "completed", "Completed", and "  completed  "
+            Task.assigned_to == user_id_str,
             func.lower(func.trim(Task.status)) == "completed"
         )
     )
-    print(f"DEBUG: Current User ID String: '{user_id_str}'")
-    # Get one task from DB to see what its assigned_to looks like
-    result = await db.execute(select(Task.assigned_to).limit(1))
-    raw_val = result.scalar()
-    print(f"DEBUG: Example Task assigned_to in DB: '{raw_val}'")
 
     return {
         "total_orgs": org_count or 0,
