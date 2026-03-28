@@ -18,35 +18,53 @@
 <body>
     <div id="modal-task-overlay" class="modal-overlay">
         <div class="modal-content"
-            style="background: #1f2937; color: white; padding: 20px; border-radius: 12px; width: 400px;">
+            style="background: #1f2937; color: white; padding: 20px; border-radius: 12px; width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
 
-            <h3 id="task-modal-title">New Task</h3>
+            <h3 id="task-modal-title" style="margin-top: 0; margin-bottom: 20px; font-size: 1.25rem;">New Task</h3>
 
             <input type="hidden" id="task-status-input" value="Pending">
 
-            <label>Title</label>
-            <input type="text" id="task-title" style="width: 100%; margin-bottom: 15px;">
+            <label style="display: block; font-size: 13px; color: #9ca3af; margin-bottom: 5px;">Title</label>
+            <input type="text" id="task-title"
+                style="width: 100%; margin-bottom: 15px; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; outline: none;">
 
-            <label>Description</label>
-            <textarea id="task-desc" style="width: 100%; margin-bottom: 15px;"></textarea>
+            <label style="display: block; font-size: 13px; color: #9ca3af; margin-bottom: 5px;">Description</label>
+            <textarea id="task-desc" rows="3"
+                style="width: 100%; margin-bottom: 15px; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; outline: none; resize: none;"></textarea>
 
-            <label>Priority</label>
-            <select id="task-priority" style="width: 100%; margin-bottom: 15px;">
-                <option value="Low">Low</option>
-                <option value="Medium" selected>Medium</option>
-                <option value="High">High</option>
-            </select>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 13px; color: #9ca3af; margin-bottom: 5px;">Priority</label>
+                    <select id="task-priority"
+                        style="width: 100%; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; cursor: pointer;">
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
 
-            <label>Due Date</label>
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 13px; color: #9ca3af; margin-bottom: 5px;">Assign
+                        To</label>
+                    <select id="task-assignee-input"
+                        style="width: 100%; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; cursor: pointer;">
+                        <option value="">Assign to Me</option>
+                    </select>
+                </div>
+            </div>
+
+            <label style="display: block; font-size: 13px; color: #9ca3af; margin-bottom: 5px;">Due Date</label>
             <input type="date" id="task-due-date"
-                style="width: 100%; margin-bottom: 20px; background: #374151; color: white; border: 1px solid #4b5563; padding: 5px; border-radius: 4px;">
+                style="width: 100%; margin-bottom: 25px; background: #374151; color: white; border: 1px solid #4b5563; padding: 8px; border-radius: 6px; outline: none;">
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center;">
                 <button onclick="closeTaskModal()"
-                    style="background: transparent; color: #9ca3af; border: none; cursor: pointer;">Cancel</button>
+                    style="background: transparent; color: #9ca3af; border: none; cursor: pointer; font-size: 14px; font-weight: 500;">Cancel</button>
                 <button onclick="saveTask()"
-                    style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Save
-                    Task</button>
+                    style="background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s;"
+                    onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">
+                    Save Task
+                </button>
             </div>
         </div>
     </div>

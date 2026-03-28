@@ -17,29 +17,48 @@ class TaskService:
         task_data: TaskCreate,
         user: User,
     ) -> Task:
+        # 1. Determine assignee (Default to the creator if not specified)
         assignee_id = task_data.assigned_to if task_data.assigned_to else str(user.id)
 
+        # 2. Create the instance
         task = Task(
             title=task_data.title,
             description=task_data.description,
             project_id=task_data.project_id,
             assigned_to=assignee_id,
-            priority=task_data.priority,
-            status=task_data.status,
+            priority=task_data.priority or "Medium",
+            status=task_data.status or "Pending",
             due_date=task_data.due_date,
         )
 
+        # 3. Save to database
         db.add(task)
         await db.commit()
         
-        # After commit, fetch the task AGAIN with the assignee loaded
+        # 4. Fetch the task with ALL relationships loaded
+        # This specifically avoids the 'MissingGreenlet' error for Amir
         result = await db.execute(
             select(Task)
-            .options(joinedload(Task.assignee))
+            .options(
+                joinedload(Task.assignee),
+                joinedload(Task.project).joinedload(Project.organization)
+            )
             .where(Task.id == task.id)
         )
-        return result.scalar_one()
+        
+        db_task = result.scalar_one()
 
+        # 5. Manual Mapping for the 'Flattened' Schema fields
+        # These fields (project_name, etc.) are needed by TaskResponse
+        if db_task.project:
+            db_task.project_name = db_task.project.name
+            db_task.organization_id = str(db_task.project.organization_id)
+            
+            if db_task.project.organization:
+                db_task.organization_name = db_task.project.organization.name
+        
+        return db_task 
+    
     @staticmethod
     async def update_task(
         db: AsyncSession,

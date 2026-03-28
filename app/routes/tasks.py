@@ -119,25 +119,36 @@ async def get_my_global_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Ensure we are searching by the exact string ID
     user_id_str = str(current_user.id).strip()
+    
+    # --- START DEBUG LOGGING ---
+    print(f"\n--- DEBUG START ---")
+    print(f"Amir's ID (Current User): '{user_id_str}'")
+    
+    # Get EVERY task in the DB to see what is actually stored
+    all_tasks = await db.execute(select(Task.title, Task.assigned_to))
+    rows = all_tasks.all()
+    print(f"Checking all {len(rows)} tasks in database:")
+    for row in rows:
+        match = "MATCH!" if str(row.assigned_to) == user_id_str else "NO MATCH"
+        print(f" - Task: '{row.title}' | Assigned To in DB: '{row.assigned_to}' | Result: {match}")
+    print(f"--- DEBUG END ---\n")
+    # --- END DEBUG LOGGING ---
 
+    # Your existing query
     query = (
         select(Task)
         .options(
             joinedload(Task.assignee),
             joinedload(Task.project).joinedload(Project.organization)
         )
-        # Use func.cast to ensure the DB treats the column as a string
         .where(func.cast(Task.assigned_to, String) == user_id_str)
     )
     
     result = await db.execute(query)
     tasks = result.scalars().all()
     
-    # Debug: See what the DB actually found
-    print(f"DEBUG: Found {len(tasks)} tasks for User ID {user_id_str}")
-
+    # Mapping logic...
     for t in tasks:
         if t.project:
             t.project_name = t.project.name

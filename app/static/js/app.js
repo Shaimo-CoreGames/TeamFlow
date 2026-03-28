@@ -1871,44 +1871,45 @@ async function deleteComment(commentId) {
             }
         }
 
-        async function saveTask() {
-            const title = document.getElementById('task-title').value;
-            const projectId = state.currentProjectId; // Must be set when you enter a project view
+        async function loadTasks(projectId) {
+    if (!projectId) return;
+    
+    try {
+        // Fetch fresh data from the server
+        const tasks = await api('GET', `/projects/${projectId}/tasks`);
+        
+        // Update the global state
+        state.tasks = tasks;
+        
+        // Optional: Update cache ONLY after a successful fetch
+        sessionStorage.setItem('tf_tasks', JSON.stringify(tasks));
+        
+        // Render the UI
+        renderBoard(); 
+    } catch (err) {
+        console.error("Failed to load tasks from server:", err);
+        // Fallback to cache only if server fails
+        state.tasks = JSON.parse(sessionStorage.getItem('tf_tasks') || '[]');
+    }
+}
 
-            if (!title) return showToast("Title is required", "error");
-            if (!projectId) return showToast("Project ID is missing", "error");
+        async function populateAssigneeDropdown(projectId) {
+    const select = document.getElementById('task-assignee');
+    if (!select) return;
 
-            // Get the date string from the input
-            const dateValue = document.getElementById('task-due-date').value;
-
-            const payload = {
-                title: title,
-                description: document.getElementById('task-desc').value,
-                priority: document.getElementById('task-priority').value,
-                status: document.getElementById('task-status-input').value || "Pending",
-                project_id: projectId, // Matches your TaskCreate schema
-                due_date: dateValue ? new Date(dateValue).toISOString() : null
-            };
-
-            try {
-                // MATCHING THE ROUTE: /projects/{project_id}/tasks
-                const response = await api('POST', `/projects/${projectId}/tasks`, payload);
-
-                showToast("Task created successfully", "success");
-                closeTaskModal();
-
-                // Refresh your task list
-                if (typeof loadTasks === 'function') loadTasks(projectId);
-            } catch (err) {
-                console.error("Task Creation Failed:", err);
-                showToast("Failed to create task. Check console.", "error");
-            }
-        }
-
-        async function loadTasks() {
-            // Tasks are per-project; we load them from what we create/cache
-            state.tasks = JSON.parse(sessionStorage.getItem('tf_tasks') || '[]');
-        }
+    try {
+        // Fetch members for this project
+        const members = await api('GET', `/projects/${projectId}/members`);
+        
+        // Build the options using the USER ID as the value
+        select.innerHTML = '<option value="">Assign to Me</option>' + 
+            members.map(m => `
+                <option value="${m.user.id}">${m.user.full_name || m.user.email}</option>
+            `).join('');
+    } catch (e) {
+        console.error("Error loading members:", e);
+    }
+}
 
         function saveCachedTasks() {
             sessionStorage.setItem('tf_tasks', JSON.stringify(state.tasks));
@@ -2052,6 +2053,24 @@ async function deleteComment(commentId) {
                 showToast("Failed to delete task", "error");
             }
         }
+        async function refreshAssigneeDropdown(projectId) {
+    const select = document.getElementById('task-assignee-input');
+    if (!select) return;
+
+    try {
+        // Fetch members belonging to this specific project
+        const members = await api('GET', `/projects/${projectId}/members`);
+        
+        // Populate the dropdown with User IDs as values
+        select.innerHTML = '<option value="">Assign to me (Default)</option>' + 
+            members.map(m => `
+                <option value="${m.user.id}">${m.user.full_name || m.user.email}</option>
+            `).join('');
+    } catch (err) {
+        console.error("Failed to load project members for dropdown:", err);
+        select.innerHTML = '<option value="">Error loading members</option>';
+    }
+}
 
         // Helper function to color-code the priority text and border
         function getPriorityColor(priority) {
@@ -2084,39 +2103,87 @@ async function deleteComment(commentId) {
  * @param {string} status - The status of the column ('Pending', 'In Progress', 'Completed')
  */
         // 1. Consolidated Modal Opener
-        function openTaskModal(status = 'Pending') {
-            const modalOverlay = document.getElementById('modal-task-overlay');
+        async function openTaskModal(status = 'Pending') {
+    const modalOverlay = document.getElementById('modal-task-overlay');
+    if (!modalOverlay) return;
 
-            if (!modalOverlay) {
-                console.error("Modal overlay not found in DOM.");
-                return;
-            }
+    // 1. Set status and clear text fields
+    const statusInput = document.getElementById('task-status-input');
+    if (statusInput) statusInput.value = status;
 
-            // Set the status - this is crucial for your "Sync" to know which column to use
-            const statusInput = document.getElementById('task-status-input');
-            if (statusInput) {
-                statusInput.value = status;
-            }
+    ['task-title', 'task-desc', 'task-due-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
 
-            // Update the UI text
-            const modalTitle = document.getElementById('task-modal-title');
-            if (modalTitle) {
-                modalTitle.textContent = `Create New Task (${status})`;
-            }
-
-            // Reset fields for a fresh entry
-            const fields = ['task-title', 'task-desc', 'task-due-date'];
-            fields.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = "";
-            });
-
-            const priorityEl = document.getElementById('task-priority');
-            if (priorityEl) priorityEl.value = "Medium";
-
-            // Show the modal
-            modalOverlay.classList.add('active');
+    // 2. Populate the "Assign To" dropdown with actual Project Members
+    const assigneeSelect = document.getElementById('task-assignee-input');
+    if (assigneeSelect && state.currentProjectId) {
+        assigneeSelect.innerHTML = '<option value="">Loading members...</option>';
+        try {
+            // Fetch project members from your API
+            const members = await api('GET', `/projects/${state.currentProjectId}/members`);
+            
+            // Generate options: The VALUE must be the user.id (UUID)
+            assigneeSelect.innerHTML = '<option value="">Assign to Me</option>' + 
+                members.map(m => `
+                    <option value="${m.user.id}">${m.user.full_name || m.user.email}</option>
+                `).join('');
+        } catch (err) {
+            console.error("Failed to load members:", err);
+            assigneeSelect.innerHTML = '<option value="">Error loading members</option>';
         }
+    }
+
+    modalOverlay.classList.add('active');
+}
+
+async function saveTask() {
+    const title = document.getElementById('task-title').value;
+    const projectId = state.currentProjectId;
+    
+    // Get the UUID from the dropdown we added to the HTML
+    const assigneeSelect = document.getElementById('task-assignee-input');
+    const assignedTo = assigneeSelect ? assigneeSelect.value : null;
+
+    if (!title) return showToast("Title is required", "error");
+
+    const payload = {
+        title: title,
+        description: document.getElementById('task-desc').value,
+        priority: document.getElementById('task-priority').value,
+        status: document.getElementById('task-status-input').value || "Pending",
+        project_id: projectId,
+        assigned_to: assignedTo, // This MUST be Amir's UUID from the dropdown
+        due_date: document.getElementById('task-due-date').value || null
+    };
+
+    try {
+        await api('POST', `/projects/${projectId}/tasks`, payload);
+        
+        // Clear the old cache so it doesn't conflict
+        sessionStorage.removeItem('tf_tasks');
+        
+        showToast("Task created successfully", "success");
+        closeTaskModal();
+        
+        // Refresh the board with the NEW data from the DB
+        await loadTasks(projectId); 
+    } catch (err) {
+        console.error("Task Creation Failed:", err);
+    }
+}
+
+// Updated loadTasks to actually fetch from the API
+async function loadProjectTasks(projectId) {
+    try {
+        const tasks = await api('GET', `/projects/${projectId}/tasks`);
+        state.tasks = tasks; // Update local state with DB truth
+        renderBoard(); // Call your function that draws the cards
+    } catch (err) {
+        console.error("Failed to load tasks from server", err);
+    }
+}
 
         // 2. Simple Closer
         function closeTaskModal() {
