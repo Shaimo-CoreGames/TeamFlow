@@ -12,7 +12,7 @@ TeamFlow is a high-performance, asynchronous project management tool designed to
 - **Database:** [SQLAlchemy](https://www.sqlalchemy.org/) with **AioSQLite** for async database operations.
 - **Security:** OAuth2 with Password Flow, **JWT (JSON Web Tokens)**, and **Bcrypt** password hashing.
 - **DevOps:** [Docker](https://www.docker.com/) & Docker Compose for containerization.
-- **Frontend:** Vanilla JavaScript, HTML5, and CSS3 (Responsive Design).
+- **Frontend:** Vanilla JavaScript, HTML5, and CSS3 (Responsive Design.
 - **Deployment:** Render (Backend Dockerized).
 
 ---
@@ -49,7 +49,7 @@ Bash
 
 # Run the container
   docker run -p 8000:10000 --env-file .env teamflow
-The application will be available at http://localhost:8000.
+- The application will be available at http://localhost:8000.
 
 📸 Screenshots
 Login:
@@ -58,6 +58,6 @@ PageDashboard:
 <img width="1920" height="838" alt="image" src="https://github.com/user-attachments/assets/7532f9cf-76f2-40ad-bff8-1427657ffffb" />
 
 🤝 Contact & Support
-Project Maintainer: [SHAH MEER]
-LinkedIn: [https://www.linkedin.com/in/shah-meer-3642233b2]
-GitHub: [https://github.com/Shaimo-CoreGames]
+- Project Maintainer: [SHAH MEER]
+- LinkedIn: [https://www.linkedin.com/in/shah-meer-3642233b2]
+- GitHub: [https://github.com/Shaimo-CoreGames]
