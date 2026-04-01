@@ -45,10 +45,12 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 ### 3. Running with Docker
 Bash
 # Build the image
-  docker build -t teamflow .
+  ```
+docker build -t teamflow .
+```
 
 # Run the container
-  docker run -p 8000:10000 --env-file .env teamflow
+  ```docker run -p 8000:10000 --env-file .env teamflow```
 - The application will be available at http://localhost:8000.
 
 📸 Screenshots
